@@ -1,0 +1,21 @@
+name: Sugestão
+description: Uma função nova ou uma melhoria
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problema
+    attributes:
+      label: Qual problema a sugestão resolve
+    validations:
+      required: true
+  - type: textarea
+    id: proposta
+    attributes:
+      label: Proposta
+    validations:
+      required: true
+  - type: input
+    id: fone
+    attributes:
+      label: Modelo do fone
+      placeholder: QCY HT05

@@ -1,0 +1,19 @@
+.plan/
+re/
+__pycache__/
+*.pyc
+.venv/
+build/
+dist/
+*.egg-info/
+
+# Segredos e arquivos locais
+.env
+.env.*
+.claude/
+.impeccable/
+.pytest_cache/
+.ruff_cache/
+graphify-out/
+packaging/windows/packages/
+packaging/windows/qcyctl/

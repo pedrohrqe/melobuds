@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=MeloBuds by @pedrohrqe
+Comment=Controla o fone QCY HT05: ruído, equalizador, toques e bateria
+Exec=qcyctl-gui
+Icon=qcyctl
+Terminal=false
+Categories=AudioVideo;Audio;Settings;

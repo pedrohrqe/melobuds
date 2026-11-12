@@ -1,0 +1,5 @@
+#!/bin/sh
+# Sem argumentos abre a GUI. "<arquivo>.AppImage cli <args>" executa a CLI.
+HERE="$(dirname "$(readlink -f "$0")")"
+if [ "$1" = "cli" ]; then shift; exec "$HERE/usr/lib/qcyctl/qcyctl" "$@"; fi
+exec "$HERE/usr/lib/qcyctl/qcyctl-gui" "$@"

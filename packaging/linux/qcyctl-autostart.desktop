@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=MeloBuds by @pedrohrqe
+Comment=Inicia o controle do QCY HT05 minimizado na bandeja
+Exec=qcyctl-gui --hidden
+Icon=qcyctl
+Terminal=false
+X-GNOME-Autostart-enabled=true
