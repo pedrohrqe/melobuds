@@ -4,13 +4,15 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/../.."
-PY=${PYTHON:-python3}
-VERSION=$($PY -c "import tomllib;print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+VERSION=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
 OUT=dist/packages
 mkdir -p "$OUT"
 
 # 1. Executáveis (pasta dist/qcyctl).
-$PY -m PyInstaller --noconfirm --log-level WARN packaging/qcyctl.spec
+cargo build --release --locked --bin qcyctl-gui --bin qcyctl
+rm -rf dist/qcyctl
+mkdir -p dist/qcyctl
+cp target/release/qcyctl-gui target/release/qcyctl dist/qcyctl/
 
 # 2. RPM (rpmbuild).
 if command -v rpmbuild > /dev/null; then
@@ -22,7 +24,7 @@ else
 fi
 
 # 3. DEB (script próprio, sem dpkg-deb).
-$PY packaging/linux/make_deb.py "$VERSION" "$OUT/qcyctl_${VERSION}_amd64.deb"
+python3 packaging/linux/make_deb.py "$VERSION" "$OUT/qcyctl_${VERSION}_amd64.deb"
 
 # 4. AppImage (precisa do appimagetool no PATH ou em $APPIMAGETOOL).
 APPIMAGETOOL=${APPIMAGETOOL:-$(command -v appimagetool || true)}

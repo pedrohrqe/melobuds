@@ -1,0 +1,103 @@
+import { Theme } from "theme.slint";
+import { Battery } from "backend.slint";
+import { NoiseWaves } from "noise-waves.slint";
+import { BatteryReadout } from "battery-readout.slint";
+import { Earbud } from "earbud.slint";
+import { CaseShape } from "case-shape.slint";
+
+// Herói: fones esquerdo e direito e a caixa, cada um com a bateria acima.
+export component EarbudsHero inherits Rectangle {
+    in property <bool> connected: false;
+    in property <[Battery]> battery;
+    in property <int> noise-kind: -1;
+    in property <int> noise-level: 3;
+    in property <bool> show-case: true;       // "Ignorar caixa" esconde a caixa e centraliza os fones
+    property <length> col-w: self.width / 3;
+    property <length> ox: show-case ? 0px : col-w / 2;
+    animate ox { duration: Theme.d(Theme.normal); easing: Theme.out-cubic; }
+    preferred-height: 236px;
+
+    // Percentual e carga de cada peça (-1 sem leitura).
+    function pct(i: int) -> int { return battery.length > i ? battery[i].percent : -1; }
+    function chg(i: int) -> bool { return battery.length > i ? battery[i].charging : false; }
+
+    public function sweep() {
+        left.sweep();
+        right.sweep();
+        case-r.sweep();
+    }
+
+    NoiseWaves {
+        x: root.ox;
+        y: 54px;
+        width: root.col-w * 2;
+        height: 172px;
+        kind: root.noise-kind;
+        level: root.noise-level;
+        active: root.connected;
+    }
+
+    // Anel de busca: pulsa enquanto o app procura o fone (1800 ms, saída cúbica).
+    property <bool> ring-on: !connected && Theme.loop;
+    property <float> ring-u: ring-on ? Math.mod(Theme.tick() / 1800ms, 1) : 0;
+    property <float> ring-e: 1 - (1 - ring-u) * (1 - ring-u) * (1 - ring-u);
+    property <float> ring-s: 0.7 + 0.45 * ring-e;
+    Rectangle {
+        width: 190px * root.ring-s;
+        height: 150px * root.ring-s;
+        x: root.ox + root.col-w - self.width / 2;
+        y: 140px - self.height / 2;
+        border-radius: self.height / 2;
+        background: transparent;
+        border-color: Theme.accent;
+        border-width: 1px;
+        visible: root.ring-on;
+        opacity: 0.45 * (1 - root.ring-e);
+    }
+
+    left := BatteryReadout {
+        x: root.ox + root.col-w * 0.5 - self.width / 2 + 10px;
+        y: 0;
+        label: "Esquerdo";
+        percent: root.connected ? root.pct(0) : -1;
+        charging: root.connected && root.chg(0);
+    }
+    right := BatteryReadout {
+        x: root.ox + root.col-w * 1.5 - self.width / 2 - 10px;
+        y: 0;
+        label: "Direito";
+        percent: root.connected ? root.pct(1) : -1;
+        charging: root.connected && root.chg(1);
+    }
+    case-r := BatteryReadout {
+        x: root.col-w * 2.5 - self.width / 2;
+        y: 0;
+        label: "Caixa";
+        visible: self.opacity > 0;
+        opacity: root.show-case ? 1 : 0;
+        animate opacity { duration: Theme.d(Theme.fast); }
+        percent: root.connected ? root.pct(2) : -1;
+        charging: root.connected && root.chg(2);
+    }
+
+    Earbud {
+        x: root.ox + root.col-w * 0.5 - self.width / 2 + 6px;
+        y: 82px;
+        present: root.connected;
+    }
+    Earbud {
+        x: root.ox + root.col-w * 1.5 - self.width / 2 - 6px;
+        y: 82px;
+        mirrored: true;
+        present: root.connected;
+    }
+    CaseShape {
+        x: root.col-w * 2.5 - self.width / 2;
+        y: 120px;
+        present: root.connected && root.pct(2) >= 0;
+        visible: self.opacity > 0;
+        opacity: root.show-case ? 1 : 0;
+        animate opacity { duration: Theme.d(Theme.fast); }
+        charging: root.connected && root.chg(2);
+    }
+}

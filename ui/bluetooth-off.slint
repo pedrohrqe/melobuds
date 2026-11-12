@@ -1,0 +1,175 @@
+import { Theme } from "theme.slint";
+import { Button } from "button.slint";
+import { IconBluetooth, BtSlash } from "icons.slint";
+
+// Aviso de Bluetooth desligado. O emblema mostra o estado sem depender só da cor:
+// um traço corta o símbolo do Bluetooth. Ao ligar, o traço recolhe e um anel pulsa uma vez.
+export component BluetoothOff inherits Rectangle {
+    in property <bool> off: false;            // Bluetooth do sistema desligado
+    in property <bool> can-enable: false;     // o app consegue ligar o Bluetooth
+    callback enable-requested();
+
+    preferred-height: col.preferred-height + 2 * Theme.s5;
+    border-radius: Theme.radius;
+    background: Theme.surface;
+    border-width: 1px;
+    border-color: Theme.hairline;
+    visible: card-p > 0;
+    opacity: card-p;
+
+    property <bool> busy: false;
+    // Opacidade do cartão (0..1) e o tempo da animação dela.
+    property <float> card-p: off ? 1 : 0;
+    property <duration> card-dur: Theme.d(Theme.normal);
+    animate card-p { duration: card-dur; easing: Theme.out-cubic; }
+    // Emblema: sobe 16 px na entrada.
+    property <float> emblem-p: off ? 1 : 0;
+    property <bool> emblem-anim: true;
+    animate emblem-p { duration: emblem-anim ? Theme.d(Theme.normal) : 0ms; easing: Theme.out-cubic; }
+    // Anel de confirmação: uma vez, quando o Bluetooth liga.
+    property <float> ring-t: 0;
+    property <bool> ring-anim: false;
+    animate ring-t { duration: ring-anim ? Theme.m(Theme.slow) : 0ms; easing: Theme.out-cubic; }
+    // Traço de "desligado": cresce a partir do canto superior esquerdo.
+    property <float> slash-p: off ? 1 : 0;
+    animate slash-p { duration: Theme.d(off ? Theme.normal : Theme.fast); easing: Theme.out-cubic; }
+
+    changed off => {
+        busy = false;
+        if (off) {
+            hide-timer.running = false;
+            ring-anim = false;
+            ring-t = 0;
+            emblem-anim = true;
+            card-dur = Theme.d(Theme.normal);
+            card-p = 1;
+            emblem-p = 1;
+        } else {
+            ring-anim = true;
+            ring-t = 1;
+            hide-timer.interval = Theme.reduce ? 1ms : Theme.slow;
+            hide-timer.running = true;
+        }
+    }
+    // Saída: o anel confirma "ligado" uma vez, e só depois o cartão some.
+    hide-timer := Timer {
+        interval: 600ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            card-dur = Theme.d(Theme.fast);
+            card-p = 0;
+            emblem-anim = false;
+            emblem-p = 0;
+        }
+    }
+    busy-reset := Timer {
+        interval: 5000ms;
+        running: root.busy;
+        triggered => { root.busy = false; }
+    }
+
+    // Luz na borda superior do material.
+    Rectangle {
+        x: Theme.radius;
+        y: 0;
+        width: parent.width - 2 * Theme.radius;
+        height: 1px;
+        background: Theme.edge-light;
+    }
+
+    col := VerticalLayout {
+        x: Theme.s5;
+        y: Theme.s5;
+        width: parent.width - 2 * Theme.s5;
+        alignment: start;
+        spacing: Theme.s4;
+
+        Rectangle {
+            height: 64px;
+            emblem := Rectangle {
+                x: 0;
+                width: 64px;
+                y: Theme.reduce ? 0px : (1 - root.emblem-p) * 16px;
+                height: 64px;
+                // Anel de confirmação.
+                Rectangle {
+                    width: 64px * (1 + 0.7 * root.ring-t);
+                    height: self.width;
+                    x: (parent.width - self.width) / 2;
+                    y: (parent.height - self.height) / 2;
+                    border-radius: self.width / 2;
+                    background: transparent;
+                    border-width: 2px;
+                    border-color: Theme.accent;
+                    opacity: Theme.reduce ? 0 : 0.6 * (1 - root.ring-t);
+                }
+                Rectangle {
+                    border-radius: 32px;
+                    background: Theme.surface-hi;
+                    border-width: 1px;
+                    border-color: root.off ? Theme.edge-light : Theme.accent;
+                    animate border-color { duration: Theme.d(Theme.fast); }
+                }
+                IconBluetooth {
+                    x: 18px;
+                    y: 18px;
+                    ink: root.off ? Theme.text3 : Theme.accent;
+                }
+                // Revela o traço da esquerda para a direita (xScale do QML).
+                Rectangle {
+                    x: 0;
+                    y: 0;
+                    width: 14px + root.slash-p * 36px;
+                    height: 64px;
+                    clip: true;
+                    BtSlash {
+                        x: 0;
+                        y: 0;
+                        outline: Theme.surface-hi;
+                        ink: Theme.bad;
+                    }
+                }
+            }
+        }
+        VerticalLayout {
+            spacing: Theme.s2;
+            Text {
+                text: root.off ? "Bluetooth desligado" : "Bluetooth ligado";
+                font-family: Theme.family;
+                font-size: Theme.size-heading;
+                font-weight: 600;
+                color: Theme.text;
+            }
+            Rectangle {
+                preferred-height: body-t.preferred-height;
+                // y -2 px: o QML não põe entrelinha acima da primeira linha.
+                body-t := Text {
+                    x: 0;
+                    y: -2px;
+                    width: root.width - 2 * Theme.s5;
+                    wrap: word-wrap;
+                    line-height-factor: 1.3;
+                    text: root.can-enable
+                        ? "O app não procura o fone com o Bluetooth desligado. Ligue o Bluetooth; o app conecta o fone em seguida."
+                        : "O app não procura o fone com o Bluetooth desligado. Ligue o Bluetooth nas configurações do sistema; o app conecta o fone em seguida.";
+                    font-family: Theme.family;
+                    font-size: Theme.size-body;
+                    color: Theme.text2;
+                }
+            }
+        }
+        if root.can-enable: HorizontalLayout {
+            alignment: start;
+            Button {
+                primary: true;
+                enabled: root.off && !root.busy;
+                text: root.busy ? "Ligando…" : "Ligar Bluetooth";
+                clicked => {
+                    root.busy = true;
+                    root.enable-requested();
+                }
+            }
+        }
+    }
+}

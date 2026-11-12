@@ -4,28 +4,28 @@
 
 ## Platform
 
-desktop (Linux: Fedora, Ubuntu; Windows 10+). Qt Quick (PySide6). Not web.
+Desktop (Linux: Fedora, Ubuntu; Windows 10+). Interface em Slint, com renderização por software. Não é web.
 
 ## Users
 
-Owners of the QCY HT05 (MeloBuds ANC) earbuds who use a PC. The official app exists only for phones. Many users have no phone with the app, or use a dual-boot PC. They open the app to change the noise mode, the EQ, or the touch controls, and to check the battery. Sessions are short and frequent; the app usually lives in the system tray.
+Donos do fone QCY HT05 (MeloBuds ANC) que usam PC. O app oficial existe só para celular. Muitos usuários não têm celular com o app, ou usam um PC com dual boot. Eles abrem o app para trocar o modo de ruído, o EQ ou os controles de toque, e para ver a bateria. As sessões são curtas e frequentes; o app costuma ficar na bandeja do sistema.
 
 ## Product Purpose
 
-Control every function of the HT05 from the PC: noise mode (ANC scenes and levels, transparency levels), EQ (presets and 10 custom bands), touch gestures, game mode, sleep mode, Bluetooth name, and battery of both earbuds and the case. Success: the app connects by itself when it opens, and each change takes effect on the earbuds in under a second.
+Controlar todas as funções do HT05 pelo PC: modo de ruído (cenas e níveis de ANC, níveis de transparência), EQ (predefinições e 10 bandas personalizadas), gestos de toque, modo jogo, modo sono, nome Bluetooth e bateria dos dois fones e do estojo. Sucesso: o app conecta sozinho ao abrir, e cada mudança faz efeito nos fones em menos de um segundo.
 
 ## Positioning
 
-The only PC app for the HT05. It speaks the earbuds' own BLE protocol (reverse engineered from the official app), so it needs no phone and no account. It is self-contained: the package installs everything; nothing else must be installed.
+O único app de PC para o HT05. Ele usa o protocolo BLE próprio dos fones, feito por engenharia reversa do app oficial. Por isso, não precisa de celular nem de conta. O app é autocontido: o pacote instala tudo, e nada mais precisa ser instalado.
 
 ## Constraints
 
-- Self-contained packages (AppImage, RPM, DEB, Windows installer). No system dependencies declared.
-- BLE control needs no pairing. Audio uses classic Bluetooth and must stay connected.
-- The earbuds advertise BLE only for about 60 s after the audio connects; the app may briefly reconnect the audio to reach them.
-- Never send firmware/OTA or factory-reset commands.
-- UI language: Brazilian Portuguese.
+- Pacotes autocontidos (AppImage, RPM, DEB, instalador do Windows). No Linux, o app usa só fontconfig e libxkbcommon, que já vêm nos desktops.
+- O controle BLE não exige pareamento. O áudio usa Bluetooth clássico e deve ficar conectado.
+- Os fones anunciam BLE por cerca de 60 s depois que o áudio conecta. O app pode reconectar o áudio por pouco tempo para alcançá-los.
+- Nunca envie comandos de firmware (OTA) nem de restauração de fábrica.
+- Idioma da interface: português do Brasil.
 
 ## Accessibility
 
-Text contrast at least 4.5:1. Color never carries a state alone (battery level always has a number). Keyboard operation of every control. A "reduce animations" option, plus the desktop's own animation setting.
+Contraste de texto de pelo menos 4,5:1. A cor nunca indica um estado sozinha: a bateria sempre mostra um número. Operação por teclado em todos os controles. Opção "reduzir animações", além da configuração de animações do sistema.

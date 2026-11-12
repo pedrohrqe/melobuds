@@ -13,19 +13,22 @@ Remova do log os endereços Bluetooth que você não quer publicar.
 
 ## Ambiente de desenvolvimento
 
-Requisitos: Python 3.11 ou mais recente. No Linux, BlueZ 5.50 ou mais recente.
+Requisitos: Rust no canal `stable`, instalado pelo rustup. No Linux, também BlueZ 5.50 ou mais recente e o pacote de desenvolvimento do fontconfig:
+
+- Fedora: `sudo dnf install fontconfig-devel`.
+- Ubuntu e Debian: `sudo apt install libfontconfig1-dev pkg-config`.
 
 1. Clone o repositório.
-2. Crie o ambiente: `python -m venv .venv`.
-3. Instale o projeto: `.venv/bin/pip install -e ".[dev]"`.
-4. Abra o app: `.venv/bin/qcyctl-gui --debug`.
+2. Abra a interface: `cargo run`.
+3. Abra a interface com log de depuração: `cargo run -- --debug`.
+4. Execute a linha de comando: `cargo run --bin qcyctl -- status`.
 
 ## Antes de enviar um pull request
 
-1. Execute `ruff check src tests`.
-2. Execute `QT_QPA_PLATFORM=offscreen pytest -q`.
-3. Se a mudança altera a interface, siga os tokens de `DESIGN.md` e anexe uma captura de tela.
-4. Se a mudança altera o protocolo, atualize `docs/protocol.md` e os testes de `tests/test_protocol.py`.
+1. Execute `cargo clippy --all-targets`.
+2. Execute `cargo test`.
+3. Se a mudança altera a interface, siga os tokens de `DESIGN.md` e de `ui/theme.slint`. Anexe uma captura de tela, gerada com `cargo run --example shot -- <pasta>`.
+4. Se a mudança altera o protocolo, atualize `docs/protocol.md` e os testes de `src/protocol.rs`.
 
 ## Regras do código
 

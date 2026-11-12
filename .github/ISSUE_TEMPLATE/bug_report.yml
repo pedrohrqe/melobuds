@@ -30,7 +30,7 @@ body:
     id: versao
     attributes:
       label: Versão do app e tipo de instalação
-      placeholder: 0.1.0, RPM
+      placeholder: 0.2.0, RPM
     validations:
       required: true
   - type: input

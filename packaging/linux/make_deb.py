@@ -72,7 +72,7 @@ def main(version: str, target: str) -> None:
         "Package: qcyctl\n"
         f"Version: {version}\n"
         "Architecture: amd64\n"
-        "Depends: libstdc++6, libgcc-s1, libgbm1\n"
+        "Depends: libfontconfig1, libxkbcommon0\n"
         "Maintainer: qcyctl\n"
         "Section: sound\n"
         "Priority: optional\n"

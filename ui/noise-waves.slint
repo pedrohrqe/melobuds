@@ -1,0 +1,47 @@
+import { Theme } from "theme.slint";
+
+// Ondas atrás dos fones que mostram o modo de ruído.
+// ANC: as ondas entram e escurecem (o som de fora é absorvido).
+// Transparência: as ondas saem e clareiam (o som de fora passa).
+// Normal: anéis parados e fracos.
+export component NoiseWaves inherits Rectangle {
+    in property <int> kind: -1;               // 0 normal, 1 ANC, 2 transparência
+    in property <int> level: 3;
+    in property <bool> active: true;
+    property <bool> moving: active && Theme.loop && (kind == 1 || kind == 2);
+    property <duration> period: kind == 2 ? 3400ms - level * 220ms : 3000ms;
+    property <duration> clock: moving ? Theme.tick() : 0ms;
+
+    for idx in 3: Rectangle {
+        // Fase 0..1 no ciclo; ANC inverte a direção.
+        property <float> phase: idx / 3.0;
+        property <float> p: Math.mod(clock / period + phase, 1);
+        property <float> sc: !moving ? 0.86 + idx * 0.16
+            : (kind == 2 ? 0.78 + p * 0.62 : 1.4 - p * 0.62);
+        property <float> op: !active ? 0.05
+            : (!moving ? (kind == 0 ? 0.08 : 0.12)
+            : (kind == 2 ? 0.5 : 0.26) * Math.sin(p * 180deg));
+        width: root.width * 0.62 * sc;
+        height: root.height * 0.78 * sc;
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        border-radius: self.height / 2;
+        background: transparent;
+        border-width: 1px;
+        border-color: kind == 2 ? Theme.accent : Theme.text2;
+        opacity: op;
+        animate sc { duration: moving ? 0ms : Theme.d(Theme.slow); easing: Theme.out-cubic; }
+        animate op { duration: moving ? 0ms : Theme.d(Theme.normal); }
+    }
+    // Brilho central suave no modo transparência.
+    Rectangle {
+        width: root.width * 0.5;
+        height: self.width;
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        border-radius: self.width / 2;
+        background: Theme.accent;
+        opacity: root.active && root.kind == 2 ? 0.05 : 0;
+        animate opacity { duration: Theme.d(Theme.slow); }
+    }
+}

@@ -17,3 +17,6 @@ dist/
 graphify-out/
 packaging/windows/packages/
 packaging/windows/qcyctl/
+
+# Rust
+target/

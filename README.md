@@ -6,6 +6,8 @@
 
 Controle não oficial para o fone QCY HT05 (MeloBuds ANC). Oferece uma interface gráfica, um ícone na bandeja do sistema e uma linha de comando.
 
+O app é escrito em Rust, com interface em Slint.
+
 Este projeto não tem afiliação com a QCY. Autor: [@pedrohrqe](https://github.com/pedrohrqe).
 
 ## Recursos
@@ -42,7 +44,7 @@ Para reduzir as animações, ative "Reduzir animações" no cartão Dispositivo.
 Linux:
 
 - BlueZ 5.50 ou mais recente.
-- Python 3.11 ou mais recente.
+- fontconfig e libxkbcommon. Os desktops comuns já trazem essas bibliotecas.
 - GNOME: instale a extensão AppIndicator para exibir o ícone na bandeja.
 
 Windows:
@@ -52,7 +54,7 @@ Windows:
 
 ## Instalação
 
-Baixe o arquivo do seu sistema na página de [releases](https://github.com/pedrohrqe/melobuds/releases/latest). Os instaladores trazem tudo o que o app precisa; você não instala Python nem outra dependência.
+Baixe o arquivo do seu sistema na página de [releases](https://github.com/pedrohrqe/melobuds/releases/latest). Os instaladores trazem o app pronto; você não instala Rust nem outra dependência.
 
 | Sistema | Arquivo | Como instalar |
 |---|---|---|
@@ -69,11 +71,11 @@ O arquivo `SHA256SUMS.txt` do release tem as somas de verificação. O instalado
 ### A partir do código
 
 1. Clone o repositório.
-2. Execute `python -m venv .venv`.
-3. Execute `.venv/bin/pip install -e .`.
-4. Execute `.venv/bin/qcyctl-gui`.
+2. Instale o Rust pelo [rustup](https://rustup.rs), no canal `stable`.
+3. No Linux, instale o pacote de desenvolvimento do fontconfig: `sudo dnf install fontconfig-devel` ou `sudo apt install libfontconfig1-dev pkg-config`.
+4. Execute `cargo run` para abrir a interface gráfica.
 
-Para gerar os instaladores do Linux, execute `packaging/linux/build-packages.sh`.
+Para gerar os instaladores do Linux, execute `packaging/linux/build-packages.sh`. O RPM exige `rpmbuild`, e o AppImage exige `appimagetool`. O script do DEB exige `python3`.
 
 ## Uso da linha de comando
 
@@ -120,12 +122,11 @@ Para usar o fone nos dois sistemas:
 2. Inicie o Windows e pareie os fones lá.
 3. Volte ao Linux.
 4. Monte a partição do Windows somente leitura: `udisksctl mount -b /dev/<partição> -o ro`.
-5. Instale o extra de dual boot: `uv pip install -e '.[dualboot]'`.
-6. Execute `sudo .venv/bin/qcyctl dualboot`.
+5. Execute `sudo qcyctl dualboot`.
 
 O comando lê somente o registro do Windows. Antes de alterar a chave, ele faz uma cópia de segurança do arquivo de informações do BlueZ. Depois, ele reinicia o serviço `bluetooth`.
 
-Para comparar as chaves sem alterar nada, execute `sudo .venv/bin/qcyctl dualboot --dry-run`.
+Para comparar as chaves sem alterar nada, execute `sudo qcyctl dualboot --dry-run`.
 
 ## Protocolo
 
@@ -142,6 +143,10 @@ Leia [CONTRIBUTING.md](CONTRIBUTING.md) e o [código de conduta](CODE_OF_CONDUCT
 ## Licença e marcas
 
 O código usa a licença [MIT](LICENSE). Os componentes de terceiros estão em [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+Interface feita com [Slint](https://slint.dev).
+
+<a href="https://slint.dev"><img alt="Made with Slint" src="https://raw.githubusercontent.com/slint-ui/slint/master/logo/MadeWithSlint-logo-whitebg.png" height="48"></a>
 
 QCY e MeloBuds são marcas dos respectivos donos. Este projeto é independente e não tem afiliação com a QCY, nem apoio dela.
 

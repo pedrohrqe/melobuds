@@ -1,0 +1,71 @@
+import { Theme } from "theme.slint";
+import { FocusRing } from "focus-ring.slint";
+
+// Linha com texto, descrição e interruptor. O botão desliza.
+export component Toggle inherits Rectangle {
+    in property <string> text;
+    in property <string> hint;
+    in property <bool> checked: false;
+    callback toggled(bool);
+    preferred-height: Math.max(44px, col.preferred-height + Theme.s3);
+
+    fs := FocusScope {
+        // O anel de foco só aparece na navegação por teclado, nunca depois de um clique.
+        property <bool> kb: false;
+        focus-gained(reason) => { self.kb = reason == FocusReason.tab-navigation; }
+        focus-lost(reason) => { self.kb = false; }
+        key-pressed(e) => {
+            if (e.text == " ") {
+                root.toggled(!root.checked);
+                return accept;
+            }
+            return reject;
+        }
+    }
+    col := VerticalLayout {
+        x: 0;
+        y: (parent.height - self.preferred-height) / 2;
+        width: parent.width - sw.width - Theme.s3;
+        height: self.preferred-height;
+        spacing: 2px;
+        Text {
+            text: root.text;
+            font-family: Theme.family;
+            font-size: Theme.size-body;
+            font-weight: 500;
+            color: Theme.text;
+        }
+        if root.hint != "": Text {
+            text: root.hint;
+            wrap: word-wrap;
+            font-family: Theme.family;
+            font-size: Theme.size-label + 1px;
+            color: Theme.text2;
+        }
+    }
+    sw := Rectangle {
+        x: parent.width - self.width;
+        y: (parent.height - self.height) / 2;
+        width: 40px;
+        height: 24px;
+        border-radius: 12px;
+        background: root.checked ? Theme.accent : Theme.surface-hi;
+        border-width: 1px;
+        border-color: root.checked ? Theme.accent : Theme.edge-light;
+        animate background { duration: Theme.d(Theme.fast); }
+        Rectangle {
+            width: 18px;
+            height: 18px;
+            border-radius: 9px;
+            y: 3px;
+            x: root.checked ? parent.width - self.width - 3px : 3px;
+            background: root.checked ? Theme.accent-ink : Theme.text2;
+            animate x { duration: Theme.m(200ms); easing: Theme.out-cubic; }
+        }
+        FocusRing { show: fs.has-focus && fs.kb; r: 12px; w: parent.width; h: parent.height; }
+    }
+    TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.toggled(!root.checked); }
+    }
+}

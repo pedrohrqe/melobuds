@@ -1,4 +1,4 @@
-; Instalador do Windows (Inno Setup 6). Entrada: dist\qcyctl (PyInstaller).
+; Instalador do Windows (Inno Setup 6). Entrada: dist\qcyctl (cargo build --release).
 ; Uso: iscc /DAppVersion=0.1.0 packaging\windows\melobuds.iss   (na raiz do projeto)
 #ifndef AppVersion
   #define AppVersion "0.0.0"
@@ -21,7 +21,7 @@ SourceDir=..\..
 OutputDir=dist\packages
 OutputBaseFilename=qcyctl-{#AppVersion}-windows-setup
 SetupIconFile=packaging\icons\qcyctl.ico
-UninstallDisplayIcon={app}\qcyctl-gui.exe
+UninstallDisplayIcon={app}\qcyctl.ico
 LicenseFile=LICENSE
 Compression=lzma2
 SolidCompression=yes
@@ -41,8 +41,8 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; Flags: unchecked
 Source: "dist\qcyctl\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
 
 [Icons]
-Name: "{autoprograms}\MeloBuds"; Filename: "{app}\qcyctl-gui.exe"
-Name: "{autodesktop}\MeloBuds"; Filename: "{app}\qcyctl-gui.exe"; Tasks: desktopicon
+Name: "{autoprograms}\MeloBuds"; Filename: "{app}\qcyctl-gui.exe"; IconFilename: "{app}\qcyctl.ico"
+Name: "{autodesktop}\MeloBuds"; Filename: "{app}\qcyctl-gui.exe"; IconFilename: "{app}\qcyctl.ico"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\qcyctl-gui.exe"; Description: "{cm:LaunchProgram,MeloBuds}"; Flags: nowait postinstall skipifsilent

@@ -1,0 +1,18 @@
+import { Theme } from "theme.slint";
+
+// Anel de foco do teclado. Coloque como filho do controle; ele se estende 3 px para fora.
+export component FocusRing inherits Rectangle {
+    in property <bool> show: false;
+    in property <length> r: Theme.radius-sm;
+    in property <length> w;                   // largura do controle
+    in property <length> h;                   // altura do controle
+    x: -3px;
+    y: -3px;
+    width: w + 6px;
+    height: h + 6px;
+    border-radius: r + 3px;
+    border-width: 2px;
+    border-color: Theme.accent;
+    background: transparent;
+    visible: show;
+}

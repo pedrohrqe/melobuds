@@ -1,0 +1,39 @@
+import { Theme } from "theme.slint";
+
+// Campo de texto de uma linha no tema do app.
+// O limite de 32 caracteres é validado pelo Rust (rename devolve false e mostra um toast).
+export component Field inherits Rectangle {
+    in-out property <string> text;
+    in property <string> placeholder;
+    callback accepted();
+    public function unfocus() { input.clear-focus(); }
+    preferred-height: Theme.control;
+    border-radius: Theme.radius-sm;
+    background: Theme.bg;
+    border-width: input.has-focus ? 2px : 1px;
+    border-color: input.has-focus ? Theme.accent : Theme.edge-light;
+
+    input := TextInput {
+        x: Theme.s3;
+        width: parent.width - 2 * Theme.s3;
+        y: 0;
+        height: parent.height;
+        vertical-alignment: center;
+        text <=> root.text;
+        single-line: true;
+        font-family: Theme.family;
+        font-size: Theme.size-body;
+        color: Theme.text;
+        selection-background-color: Theme.accent-soft;
+        selection-foreground-color: Theme.text;
+        accepted => { root.accepted(); }
+    }
+    if input.text == "": Text {
+        x: Theme.s3;
+        y: (parent.height - self.height) / 2;
+        text: root.placeholder;
+        font-family: Theme.family;
+        font-size: Theme.size-body;
+        color: Theme.text3;
+    }
+}

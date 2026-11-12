@@ -1,0 +1,88 @@
+import { Theme } from "theme.slint";
+import { FocusRing } from "focus-ring.slint";
+
+// Slider de passos inteiros com marcas. Arraste, clique ou use as setas.
+export component StepSlider inherits Rectangle {
+    in property <int> from: 1;
+    in property <int> to: 6;
+    in property <int> value: 1;
+    in property <bool> enabled: true;
+    callback moved(int);
+    preferred-height: 36px;
+    property <int> steps: to - from;
+    property <length> usable: self.width - 20px;
+
+    function value-at(x: length) -> int {
+        return Math.round(Math.max(0, Math.min(1, (x - 10px) / usable)) * steps) + from;
+    }
+    function update(x: length) {
+        if (enabled) {
+            if (value-at(x) != root.value) { root.moved(value-at(x)); }
+        }
+    }
+
+    fs := FocusScope {
+        // O anel de foco só aparece na navegação por teclado, nunca depois de um clique.
+        property <bool> kb: false;
+        focus-gained(reason) => { self.kb = reason == FocusReason.tab-navigation; }
+        focus-lost(reason) => { self.kb = false; }
+        enabled: root.enabled;
+        key-pressed(e) => {
+            if (e.text == Key.LeftArrow) {
+                if (root.value > root.from) { root.moved(root.value - 1); }
+                return accept;
+            }
+            if (e.text == Key.RightArrow) {
+                if (root.value < root.to) { root.moved(root.value + 1); }
+                return accept;
+            }
+            return reject;
+        }
+    }
+    Rectangle {
+        x: 10px;
+        width: root.usable;
+        height: 4px;
+        y: (parent.height - self.height) / 2;
+        border-radius: 2px;
+        background: Theme.surface-hi;
+        Rectangle {
+            x: 0;
+            height: parent.height;
+            width: knob.x + knob.width / 2 - 10px;
+            border-radius: 2px;
+            background: Theme.accent;
+        }
+    }
+    for i in root.steps + 1: Rectangle {
+        width: 2px;
+        height: 8px;
+        border-radius: 1px;
+        x: 10px + i * root.usable / root.steps - 1px;
+        y: (parent.height - self.height) / 2;
+        background: i + root.from <= root.value ? Theme.accent : Theme.text3;
+        opacity: 0.6;
+    }
+    knob := Rectangle {
+        width: 20px;
+        height: 20px;
+        border-radius: 10px;
+        y: (parent.height - self.height) / 2;
+        x: (root.value - root.from) / root.steps * root.usable;
+        background: Theme.text;
+        border-width: 4px;
+        border-color: Theme.accent;
+        animate x { duration: ta.pressed ? 0ms : Theme.m(200ms); easing: Theme.out-cubic; }
+        FocusRing { show: fs.has-focus && fs.kb; r: 10px; w: parent.width; h: parent.height; }
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        pointer-event(e) => {
+            if (e.kind == PointerEventKind.down) {
+                fs.focus();
+                root.update(self.mouse-x);
+            }
+        }
+        moved => { if (self.pressed) { root.update(self.mouse-x); } }
+    }
+}

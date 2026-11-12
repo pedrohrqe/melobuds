@@ -1,0 +1,72 @@
+import { Theme } from "theme.slint";
+
+// A caixa de carga: cápsula com a junta da tampa e o LED frontal.
+export component CaseShape inherits Rectangle {
+    in property <bool> present: true;
+    in property <bool> charging: false;
+    width: 104px;
+    height: 72px;
+    opacity: present ? 1 : 0.55;
+    animate opacity { duration: Theme.d(Theme.normal); }
+    // LED: pulsa em carga (período 2800 ms, seno, 1 -> 0,35 -> 1).
+    property <float> led-op: Theme.loop && charging
+        ? 0.675 + 0.325 * Math.cos(Math.mod(Theme.tick() / 2800ms, 1) * 360deg)
+        : 1;
+
+    // O renderizador de software ignora border-radius em fundos com gradiente:
+    // o degradê vertical vira faixas de 1 px, cada uma recuada pela curva do canto.
+    property <float> r: 72 / 2.2;
+    for row in root.present ? 72 : 0: Rectangle {
+        property <float> ym: row + 0.5;
+        // Usa a borda mais externa da linha, para a faixa ficar dentro do contorno.
+        property <float> d: ym < r ? r - row : (ym > 72 - r ? row + 1 - (72 - r) : 0);
+        property <float> inset: d > 0 ? r - Math.sqrt(r * r - d * d) : 0;
+        x: inset * 1px;
+        y: row * 1px;
+        width: 104px - 2 * inset * 1px;
+        height: 1px;
+        background: #30353E.mix(Theme.bud-bottom, 1 - ym / 72);
+    }
+    shell := Rectangle {
+        border-radius: self.height / 2.2;
+        background: transparent;
+        border-width: 1px;
+        border-color: root.present ? Theme.edge-light : Theme.text3;
+
+        // Junta da tampa
+        Rectangle {
+            x: 10px;
+            width: parent.width - 20px;
+            height: 1px;
+            y: parent.height * 0.38;
+            background: #00000099;
+        }
+        Rectangle {
+            x: 12px;
+            width: parent.width - 24px;
+            height: 1px;
+            y: parent.height * 0.38 + 1px;
+            background: Theme.hairline;
+        }
+        // Brilho do LED
+        Rectangle {
+            width: 22px;
+            height: 22px;
+            border-radius: 11px;
+            x: (parent.width - self.width) / 2;
+            y: parent.height * 0.62 + 3px - 11px;
+            background: Theme.accent;
+            opacity: root.charging ? root.led-op * 0.18 : 0;
+        }
+        // LED frontal
+        Rectangle {
+            width: 6px;
+            height: 6px;
+            border-radius: 3px;
+            x: (parent.width - self.width) / 2;
+            y: parent.height * 0.62;
+            background: root.charging ? Theme.accent : #2A2F36;
+            opacity: root.led-op;
+        }
+    }
+}

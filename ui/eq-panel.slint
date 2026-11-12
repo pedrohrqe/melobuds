@@ -1,0 +1,245 @@
+import { Theme } from "theme.slint";
+import { Backend } from "backend.slint";
+import { Chip } from "chip.slint";
+import { FocusRing } from "focus-ring.slint";
+
+// Equalizador: presets e 10 bandas. A curva acompanha os controles.
+// O renderizador de software não desenha Path nem Canvas: a curva (Catmull-Rom
+// convertida em Bézier, como o QML) vira colunas de retângulos de 1 px (traço)
+// e 2 px (preenchimento com gradiente).
+export component EqPanel inherits Rectangle {
+    in property <length> avail-h: 300px;      // altura disponível (a aba inteira)
+    // Altura de tudo o que não é a área do gráfico.
+    out property <length> chrome: chips-h + hint.preferred-height + 2 * Theme.s3 + 56px;
+    property <length> chips-h: Backend.eq-preset == 255 ? 68px : 30px;
+    property <length> plot-h: Math.max(112px, avail-h - chrome);
+    property <length> plot-top: 18px;
+    property <length> gutter: 40px;
+    property <length> graph-w: self.width;
+    property <length> col-w: (graph-w - gutter) / 10;
+    property <int> drag-band: -1;
+    property <int> eq-range: Backend.eq-max - Backend.eq-min;
+
+    function gain(i: int) -> float {
+        return Backend.eq-gains.length > i ? Backend.eq-gains[i] : 0;
+    }
+    property <float> s0: gain(0);
+    animate s0 { duration: drag-band == 0 ? 0ms : Theme.m(350ms); easing: Theme.out-cubic; }
+    property <float> s1: gain(1);
+    animate s1 { duration: drag-band == 1 ? 0ms : Theme.m(350ms); easing: Theme.out-cubic; }
+    property <float> s2: gain(2);
+    animate s2 { duration: drag-band == 2 ? 0ms : Theme.m(350ms); easing: Theme.out-cubic; }
+    property <float> s3: gain(3);
+    animate s3 { duration: drag-band == 3 ? 0ms : Theme.m(350ms); easing: Theme.out-cubic; }
+    property <float> s4: gain(4);
+    animate s4 { duration: drag-band == 4 ? 0ms : Theme.m(350ms); easing: Theme.out-cubic; }
+    property <float> s5: gain(5);
+    animate s5 { duration: drag-band == 5 ? 0ms : Theme.m(350ms); easing: Theme.out-cubic; }
+    property <float> s6: gain(6);
+    animate s6 { duration: drag-band == 6 ? 0ms : Theme.m(350ms); easing: Theme.out-cubic; }
+    property <float> s7: gain(7);
+    animate s7 { duration: drag-band == 7 ? 0ms : Theme.m(350ms); easing: Theme.out-cubic; }
+    property <float> s8: gain(8);
+    animate s8 { duration: drag-band == 8 ? 0ms : Theme.m(350ms); easing: Theme.out-cubic; }
+    property <float> s9: gain(9);
+    animate s9 { duration: drag-band == 9 ? 0ms : Theme.m(350ms); easing: Theme.out-cubic; }
+    property <[float]> shown: [s0, s1, s2, s3, s4, s5, s6, s7, s8, s9];
+
+    // Posição y (px, relativa ao gráfico) de um valor em dB.
+    pure function y-for(db: float) -> float {
+        return (plot-top + (Backend.eq-max - db) / eq-range * plot-h) / 1px;
+    }
+    pure function pt-y(i: int, g: [float]) -> float {
+        return y-for(g[Math.max(0, Math.min(9, i))]);
+    }
+    pure function bez(t: float, a: float, b: float, c: float, d: float) -> float {
+        let m = 1 - t;
+        return m * m * m * a + 3 * m * m * t * b + 3 * m * t * t * c + t * t * t * d;
+    }
+    pure function dbez(t: float, a: float, b: float) -> float {
+        let m = 1 - t;
+        return 3 * (m * m * a + 2 * m * t * (b - a) + t * t * (1 - b));
+    }
+    // Valor y da curva na coluna x (px, relativa ao gráfico).
+    pure function curve-y(x: float, g: [float]) -> float {
+        let rel = (x - gutter / 1px) / (col-w / 1px) - 0.5;
+        let k = Math.max(0, Math.min(8, Math.floor(rel)));
+        let u = Math.max(0, Math.min(1, rel - k));
+        // Nos segmentos das pontas o x do Bézier não é linear: inverte por Newton.
+        let a = k == 0 ? 1 / 6 : 1 / 3;
+        let b = k == 8 ? 5 / 6 : 2 / 3;
+        let t1 = u - (bez(u, 0, a, b, 1) - u) / Math.max(0.2, dbez(u, a, b));
+        let t2 = t1 - (bez(t1, 0, a, b, 1) - u) / Math.max(0.2, dbez(t1, a, b));
+        let t3 = t2 - (bez(t2, 0, a, b, 1) - u) / Math.max(0.2, dbez(t2, a, b));
+        let t = Math.max(0, Math.min(1, t3));
+        let y0 = pt-y(k, g);
+        let y1 = pt-y(k + 1, g);
+        return bez(t, y0, y0 + (y1 - pt-y(k - 1, g)) / 6, y1 - (pt-y(k + 2, g) - y0) / 6, y1);
+    }
+    // Opacidade do preenchimento: 0,22 nas bordas, 0,04 no centro (0 dB).
+    pure function fill-alpha(y: float) -> float {
+        let top = plot-top / 1px;
+        let mid = top + plot-h / 2px;
+        let bot = top + plot-h / 1px;
+        return y < mid ? 0.22 - 0.18 * Math.max(0, (y - top) / (mid - top))
+            : 0.04 + 0.18 * Math.min(1, (y - mid) / (bot - mid));
+    }
+
+    // Presets
+    VerticalLayout {
+        y: 0;
+        height: chips-h;
+        spacing: Theme.s2;
+        HorizontalLayout {
+            spacing: Theme.s2;
+            alignment: start;
+            for p[i] in Backend.eq-presets: Chip {
+                text: p;
+                checked: Backend.eq-preset == i;
+                clicked => { Backend.set-eq-preset(i); }
+            }
+        }
+        if Backend.eq-preset == 255: HorizontalLayout {
+            alignment: start;
+            Chip { text: "Personalizado"; checked: true; }
+        }
+    }
+
+    graph := Rectangle {
+        y: chips-h + Theme.s3;
+        width: parent.width;
+        height: plot-h + 56px;
+
+        // Linhas de referência: +8, 0, -8 dB.
+        for db[i] in [Backend.eq-max, 0, Backend.eq-min]: Rectangle {
+            x: gutter;
+            y: y-for(db) * 1px;
+            width: graph.width - gutter;
+            height: 1px;
+            background: db == 0 ? Theme.edge-light : Theme.hairline;
+        }
+        for db[i] in [Backend.eq-max, 0, Backend.eq-min]: Text {
+            x: 0;
+            y: y-for(db) * 1px - 7px;
+            text: (db > 0 ? "+" : "") + db + " dB";
+            font-family: Theme.family;
+            font-size: 10px;
+            color: Theme.text2;
+        }
+
+        // Preenchimento sob a curva (colunas de 2 px).
+        for fx in Math.round((col-w * 9) / 2px): Rectangle {
+            property <float> xx: (gutter + col-w * 0.5) / 1px + fx * 2 + 1;
+            property <float> yc: curve-y(xx, shown);
+            property <float> zero: y-for(0);
+            x: gutter + col-w * 0.5 + fx * 2px;
+            y: Math.min(yc, zero) * 1px;
+            width: 2px;
+            height: Math.max(0.5, Math.abs(yc - zero)) * 1px;
+            background: yc < zero
+                ? @linear-gradient(180deg, Theme.accent.with-alpha(fill-alpha(yc)), Theme.accent.with-alpha(0.04))
+                : @linear-gradient(180deg, Theme.accent.with-alpha(0.04), Theme.accent.with-alpha(fill-alpha(yc)));
+        }
+        // Traço da curva (colunas de 1 px). O halo semitransparente suaviza os degraus,
+        // já que o renderizador de software não faz antialiasing de Path.
+        for lx in Math.round((col-w * 9) / 1px): Rectangle {
+            property <float> xx: (gutter + col-w * 0.5) / 1px + lx + 0.5;
+            property <float> yc: curve-y(xx, shown);
+            property <float> sl: Math.abs(curve-y(xx + 0.5, shown) - curve-y(xx - 0.5, shown));
+            property <float> half: Math.sqrt(1 + sl * sl);
+            x: gutter + col-w * 0.5 + lx * 1px;
+            y: (yc - half - 0.8) * 1px;
+            width: 1px;
+            height: (2 * half + 1.6) * 1px;
+            background: Theme.accent.with-alpha(0.4);
+            Rectangle {
+                y: 0.8px;
+                height: parent.height - 1.6px;
+                background: Theme.accent;
+            }
+        }
+
+        for i in 10: Rectangle {
+            x: gutter + i * col-w;
+            width: col-w;
+            height: parent.height;
+            property <int> g: Math.round(gain(i));
+            property <float> sh: shown[i];
+            property <bool> focused: fs.has-focus;
+            fs := FocusScope {
+                key-pressed(e) => {
+                    if (e.text == Key.UpArrow) {
+                        Backend.set-eq-gain(i, g + 1);
+                        return accept;
+                    }
+                    if (e.text == Key.DownArrow) {
+                        Backend.set-eq-gain(i, g - 1);
+                        return accept;
+                    }
+                    return reject;
+                }
+            }
+            thumb := Rectangle {
+                width: 14px;
+                height: 14px;
+                border-radius: 7px;
+                x: (parent.width - self.width) / 2;
+                y: y-for(sh) * 1px - 7px;
+                background: (drag-band == i || focused) ? Theme.accent : Theme.text;
+                border-width: 3px;
+                border-color: Theme.bg;
+            }
+            // Valor em dB enquanto arrasta ou com foco.
+            if drag-band == i || focused: Text {
+                x: thumb.x + (thumb.width - self.width) / 2;
+                y: thumb.y - 18px;
+                text: (g > 0 ? "+" : "") + g;
+                font-family: Theme.family;
+                font-size: 11px;
+                font-weight: 600;
+                color: Theme.accent;
+            }
+            Text {
+                x: (parent.width - self.width) / 2;
+                y: plot-top + plot-h + 14px;
+                text: Backend.eq-bands.length > i ? Backend.eq-bands[i] : "";
+                font-family: Theme.family;
+                font-size: 10px;
+                font-weight: 500;
+                color: focused ? Theme.accent : Theme.text2;
+            }
+            ta := TouchArea {
+                mouse-cursor: ns-resize;
+                pointer-event(e) => {
+                    if (e.kind == PointerEventKind.down) {
+                        fs.focus();
+                        drag-band = i;
+                        root.set-from-y(i, self.mouse-y);
+                    } else if (e.kind == PointerEventKind.up || e.kind == PointerEventKind.cancel) {
+                        drag-band = -1;
+                    }
+                }
+                moved => {
+                    if (self.pressed) { root.set-from-y(i, self.mouse-y); }
+                }
+            }
+        }
+    }
+
+    function set-from-y(band: int, y: length) {
+        // A TouchArea tem a altura do gráfico; y já está relativo a ele.
+        let db = Math.round(Backend.eq-max - (y - plot-top) / plot-h * eq-range);
+        let c = Math.max(Backend.eq-min, Math.min(Backend.eq-max, db));
+        if (c != Math.round(gain(band))) { Backend.set-eq-gain(band, c); }
+    }
+
+    hint := Text {
+        y: chips-h + Theme.s3 + plot-h + 56px + Theme.s3;
+        width: parent.width;
+        wrap: word-wrap;
+        text: "Arraste uma banda ou use as setas para cima e para baixo. A mudança vai para o fone na hora.";
+        font-family: Theme.family;
+        font-size: Theme.size-label + 1px;
+        color: Theme.text2;
+    }
+}

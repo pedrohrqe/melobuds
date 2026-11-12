@@ -1,0 +1,126 @@
+import { Theme } from "theme.slint";
+import { IconBolt } from "icons.slint";
+
+// Leitura de bateria acima de cada peça: número, nome e barra.
+// A barra anima suave; em carga, a barra pulsa devagar.
+export component BatteryReadout inherits Rectangle {
+    in property <string> label: "Esquerdo";
+    in property <int> percent: -1;            // -1 = sem leitura
+    in property <bool> charging: false;
+    // Fase da varredura de ignição: -1 parado, 0 zera, 1 sobe a 100, 2 volta ao valor real.
+    property <int> sweep-step: -1;
+    property <float> shown: sweep-step == 0 ? 0 : (sweep-step == 1 ? 100 : Math.max(percent, 0));
+    property <color> tone: Theme.battery-color(percent);
+    width: 96px;
+    height: col.preferred-height;
+
+    animate shown {
+        duration: sweep-step == 0 ? 0ms : (sweep-step == 1 ? 520ms : (sweep-step == 2 ? 700ms : Theme.m(650ms)));
+        easing: sweep-step == 1 ? Theme.out-cubic : (sweep-step == 2 ? Theme.in-out-cubic : Theme.out-cubic);
+    }
+
+    // Varredura de ignição: ao conectar, as barras sobem a 100 e voltam ao valor real.
+    public function sweep() {
+        if (Theme.reduce) { return; }
+        sweep-step = 0;
+        t1.running = true;
+    }
+    t1 := Timer {
+        interval: 120ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            sweep-step = 1;
+            t2.running = true;
+        }
+    }
+    t2 := Timer {
+        interval: 600ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            sweep-step = 2;
+            t3.running = true;
+        }
+    }
+    t3 := Timer {
+        interval: 700ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            sweep-step = -1;
+        }
+    }
+
+    // Pulso da barra em carga: opacidade 1 -> 0,45 -> 1 (período 2400 ms, seno).
+    property <float> pulse: Theme.loop && charging
+        ? 0.725 + 0.275 * Math.cos(Math.mod(Theme.tick() / 2400ms, 1) * 360deg)
+        : 1;
+
+    col := VerticalLayout {
+        alignment: start;
+        spacing: 6px;
+        // Número, % e raio.
+        Rectangle {
+            height: 27px;
+            HorizontalLayout {
+                alignment: center;
+                spacing: 3px;
+                num := Text {
+                    text: root.percent < 0 ? "—" : Math.round(root.sweep-step >= 0 ? root.shown : root.percent);
+                    vertical-alignment: center;
+                    font-family: Theme.display;
+                    font-weight: 600;
+                    font-size: Theme.size-readout;
+                    color: root.percent < 0 ? Theme.text3 : Theme.text;
+                }
+                if root.percent >= 0: Rectangle {
+                    width: pct.preferred-width;
+                    pct := Text {
+                        y: 8px;
+                        text: "%";
+                        font-family: Theme.family;
+                        font-weight: 500;
+                        font-size: Theme.size-body;
+                        color: Theme.text2;
+                    }
+                }
+                if root.charging: Rectangle {
+                    width: 13px;
+                    IconBolt { y: 7px; ink: Theme.accent; }
+                }
+            }
+        }
+        Rectangle {
+            height: 4px;
+            HorizontalLayout {
+                alignment: center;
+                track := Rectangle {
+                    width: 56px;
+                    height: 4px;
+                    border-radius: 2px;
+                    background: Theme.surface-hi;
+                    Rectangle {
+                        x: 0;
+                        height: parent.height;
+                        width: parent.width * Math.min(root.shown, 100) / 100;
+                        border-radius: 2px;
+                        background: root.tone;
+                        opacity: root.pulse;
+                    }
+                }
+            }
+        }
+        // Sem largura fixa: "Esquerdo · carregando" é mais largo que a coluna e não pode ser cortado.
+        HorizontalLayout {
+            alignment: center;
+            Text {
+                text: root.charging ? root.label + " · carregando" : root.label;
+                font-family: Theme.family;
+                font-size: Theme.size-label;
+                font-weight: 500;
+                color: Theme.text2;
+            }
+        }
+    }
+}

@@ -1,0 +1,98 @@
+import { Theme } from "theme.slint";
+
+// Um fone HT05 de frente: cabeça arredondada, ponta de silicone e haste.
+// Desenhado para o lado esquerdo; mirrored espelha em x (o renderizador de
+// software não tem transformações: as posições são espelhadas à mão).
+// O renderizador de software (sem a feature "software-renderer-path") não desenha
+// Path, e ignora border-radius em fundos com gradiente. Por isso a haste é uma
+// varredura de colunas de 1 px e a cabeça é uma pilha de elipses sólidas, cada
+// uma mais clara e deslocada para a luz do alto à esquerda.
+export component Earbud inherits Rectangle {
+    in property <bool> mirrored: false;
+    in property <bool> present: true;     // false: só o contorno (procurando)
+    width: 92px;
+    height: 132px;
+    opacity: present ? 1 : 0.55;
+    animate opacity { duration: Theme.d(Theme.normal); easing: Theme.out-cubic; }
+
+    // x espelhado de um item de largura w.
+    pure function fx(x: length, w: length) -> length {
+        return mirrored ? 92px - x - w : x;
+    }
+
+    // Haste: gradiente horizontal (escuro, claro a 45 %, escuro) em colunas.
+    for col in root.present ? 24 : 0: Rectangle {
+        property <int> src: mirrored ? 23 - col : col;
+        property <float> u: (src + 0.5) / 24;
+        property <float> f: u < 0.45 ? u / 0.45 : (1 - u) / 0.55;
+        property <float> e: Math.min(src + 0.5, 24 - (src + 0.5));
+        property <float> drop: e < 12 ? 12 - Math.sqrt(144 - (12 - e) * (12 - e)) : 0;
+        x: 28px + col * 1px;
+        y: 52px;
+        width: 1px;
+        height: 79px - drop * 1px;
+        background: Theme.bud-bottom.mix(Theme.bud-top, 1 - f);
+    }
+    Rectangle {
+        x: 28px;
+        y: 52px;
+        width: 24px;
+        height: 79px;
+        border-top-left-radius: 0px;
+        border-top-right-radius: 0px;
+        border-bottom-left-radius: 12px;
+        border-bottom-right-radius: 12px;
+        background: transparent;
+        border-width: 1px;
+        border-color: Theme.edge-light;
+    }
+    // Ponta de silicone
+    if root.present: Rectangle {
+        x: mirrored ? 0px : 72px;
+        y: 24px;
+        width: 20px;
+        height: 28px;
+        border-radius: 10px;
+        background: Theme.tip;
+    }
+    // Cabeça: base escura e elipses cada vez menores e mais claras rumo ao ponto de luz.
+    for k in root.present ? 10 : 0: Rectangle {
+        property <float> s: 1 - k * 0.085;
+        property <length> w: 72px * s;
+        property <length> h: 64px * s;
+        x: fx(44px + (1 - s) * -9.4px - w / 2, w);
+        y: 38px + (1 - s) * -16.5px - h / 2;
+        width: w;
+        height: h;
+        border-radius: h / 2;
+        background: Theme.bud-bottom.mix(#3A404A, 1 - 1.0 * Math.pow(k / 9.0, 1.7));
+    }
+    Rectangle {
+        x: 8px;
+        y: 6px;
+        width: 72px;
+        height: 64px;
+        border-radius: 32px;
+        background: transparent;
+        border-width: 1px;
+        border-color: root.present ? Theme.edge-light : Theme.text3;
+    }
+    // Brilho da cabeça (luz de cima)
+    if root.present: Rectangle {
+        x: fx(27px, 32px);
+        y: 12px;
+        width: 32px;
+        height: 4px;
+        border-radius: 2px;
+        background: #FFFFFF0F;
+    }
+    // Microfone na ponta da haste
+    if root.present: Rectangle {
+        x: fx(36px, 8px);
+        y: 120px;
+        width: 8px;
+        height: 4px;
+        border-radius: 2px;
+        background: #00000080;
+    }
+}

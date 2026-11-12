@@ -1,0 +1,83 @@
+import { Backend } from "backend.slint";
+
+// Tokens do app. Espelha qml/Qcy/Theme.qml; componentes usam só estes valores.
+// Cores em #RRGGBBAA (formato do Slint): o QML usa #AARRGGBB.
+export global Theme {
+    // Painel noturno: fundo azul-escuro quase preto, luz de fundo azul-gelo (o LED da caixa).
+    out property <color> bg: #0B0D10;
+    out property <color> surface: #14171B;
+    out property <color> surface-hi: #1C2026;
+    out property <color> surface-press: #232831;
+    out property <color> hairline: #FFFFFF12;
+    out property <color> edge-light: #FFFFFF1C;   // luz na borda superior do material
+    out property <color> text: #ECEDEE;
+    out property <color> text2: #A1A7AD;          // 7.3:1 sobre surface
+    out property <color> text3: #6E747B;          // só para desativado e decoração
+    out property <color> accent: #8CCBFF;         // 10:1 sobre surface
+    out property <color> accent-soft: #8CCBFF26;
+    out property <color> pill: #2D3D4D;           // opção ativa do controle segmentado, sem borda
+    out property <color> accent-ink: #0B1620;     // texto sobre accent
+    out property <color> ok: #4ADE80;
+    out property <color> warn: #FBBF24;
+    out property <color> bad: #F87171;
+
+    out property <color> bud-top: #2B3038;
+    out property <color> bud-bottom: #101216;
+    out property <color> tip: #3A4048;
+
+    // Tipografia: Inter (OFL), embutida.
+    out property <string> family: "Inter";
+    out property <string> display: "Inter Display";
+    out property <length> size-title: 26px;
+    out property <length> size-readout: 22px;
+    out property <length> size-heading: 15px;
+    out property <length> size-body: 13px;
+    out property <length> size-label: 11px;
+
+    // Espaçamento (base 4).
+    out property <length> s1: 4px;
+    out property <length> s2: 8px;
+    out property <length> s3: 12px;
+    out property <length> s4: 16px;
+    out property <length> s5: 20px;
+    out property <length> s6: 24px;
+    out property <length> s8: 32px;
+    out property <length> radius: 14px;
+    out property <length> radius-sm: 9px;
+    out property <length> control: 36px;          // altura de controles (mínimo 28 no desktop)
+
+    // Movimento. Com "reduzir animações", só ficam fades curtos (Theme.d).
+    // Liga direto em Backend.reduce-motion (o Rust define a preferência).
+    in-out property <bool> reduce <=> Backend.reduce-motion;
+    // Janela visível e em foco (o Rust define MainWindow.live). Fora disso, os
+    // laços infinitos param: sem quadros novos, a CPU fica livre.
+    in property <bool> live: true;
+    out property <bool> loop: live && !reduce;
+    out property <duration> instant: 80ms;
+    out property <duration> fast: 180ms;
+    out property <duration> normal: 350ms;
+    out property <duration> slow: 600ms;
+    // Curvas de easing (equivalentes a Easing.OutCubic e InOutCubic do Qt).
+    out property <easing> out-cubic: cubic-bezier(0.215, 0.61, 0.355, 1);
+    out property <easing> in-out-cubic: cubic-bezier(0.645, 0.045, 0.355, 1);
+    // Duração efetiva: com "reduzir animações", no máximo 150 ms.
+    pure public function d(ms: duration) -> duration {
+        return reduce ? Math.min(ms, 150ms) : ms;
+    }
+    // Duração de molas e deslizes: com "reduzir animações", instantâneo.
+    pure public function m(ms: duration) -> duration {
+        return reduce ? 0ms : ms;
+    }
+    // Relógio dos laços infinitos. Só avalia animation-tick() com loop ligado:
+    // com loop desligado não há dependência e nenhum quadro é pedido.
+    pure public function tick() -> duration {
+        return loop ? animation-tick() : 0ms;
+    }
+
+    pure public function battery-color(pct: int) -> color {
+        if (pct < 0) { return text3; }
+        if (pct < 15) { return bad; }
+        if (pct <= 30) { return warn; }
+        return ok;
+    }
+}

@@ -1,0 +1,183 @@
+// Contrato entre a interface Slint e o Rust. Espelha src/qcyctl/gui/bridge.py
+// (classe Backend) em kebab-case. A interface só lê estas propriedades e só chama
+// estes callbacks. O autor da ponte Rust implementa tudo contra este arquivo:
+//   let b = ui.global::<Backend>();
+//   b.set_connected(true);                     // propriedade `in`
+//   b.on_set_noise(|kind, scene, level| ...);  // callback chamado pela interface
+//   b.invoke_toast("texto".into(), "error".into());  // callback que o Rust dispara
+//
+// ===== Propriedades de estado (Rust define; a interface só lê) =====
+//   connected            bool        fone com controle BLE ativo. false mostra o guia
+//                                    "Conectando ao fone" (ou o aviso de Bluetooth).
+//   status               string      texto de estado sob o título ("Procurando o fone…").
+//   name                 string      nome do fone (pair_name, nome ou "QCY HT05").
+//   firmware             string      versão de firmware ("4.0.0" ou "L x · R y"); "" esconde a linha.
+//   address              string      endereço do fone; "" esconde a linha.
+//   battery              [Battery]   3 itens, nesta ordem: esquerdo, direito, caixa.
+//                                    percent -1 = sem leitura ("—"). "Ignorar caixa":
+//                                    o Rust envia a caixa com percent -1 (como o bridge.py).
+//   noise-kind           int         NoiseKind: 0 normal, 1 ANC, 2 transparência, -1 desconhecido.
+//   anc-scene            string      chave da cena ANC ativa (padrão "noisy").
+//   anc-level            int         intensidade ANC 1..3 (padrão 3).
+//   trans-level          int         nível de transparência 1..6; 0 = realçar voz (padrão 4).
+//   noise-label          string      resumo no cabeçalho do cartão Ruído ("ANC Ruidoso 3").
+//   game-mode            bool        modo jogo.
+//   sleep-mode           bool        modo sono.
+//   eq-preset            int         índice do preset ativo; 255 = personalizado; -1 = nenhum.
+//   eq-gains             [int]       ganho em dB de cada banda (eq-min..eq-max), 10 itens.
+//   keys                 [int]       ação de cada gesto, índice = gesto - 1 (1..6); -1 = desconhecida.
+//   app-name             string      nome do app (janela e rodapé). Constante.
+//   credit-url           string      URL do autor ("https://github.com/pedrohrqe"). Constante.
+//   credit-text          string      credit-url sem "https://" ("github.com/pedrohrqe"), mostrado no rodapé.
+//   tray-available       bool        bandeja ativa. O fechamento da janela vai para a bandeja (ver abaixo).
+//   audio-only           bool        áudio conectado no sistema, mas sem controle BLE anunciado.
+//   bluetooth-on         bool        Bluetooth do sistema ligado (padrão true). false mostra o aviso.
+//   can-enable-bluetooth bool        o app consegue ligar o Bluetooth (só Linux/BlueZ). Constante.
+//
+// ===== Tabelas do protocolo (Rust define uma vez; constantes) =====
+//   eq-bands             [string]      rótulos das 10 bandas ("31", "62", ... "16k").
+//   eq-presets           [string]      nomes dos presets, índice = valor de eq-preset (6 itens).
+//   anc-scenes           [AncScene]    {key, label} das cenas ANC, na ordem de exibição.
+//   key-actions          [KeyAction]   {value, label} das ações de toque.
+//   eq-min / eq-max      int           limites do ganho em dB (-8 / +8).
+//
+// ===== Valores que a interface também altera (in-out, otimista) =====
+//   reduce-motion        bool        "Reduzir animações". A interface inverte na hora e chama
+//                                    set-reduce-motion; o Rust grava e atualiza MainWindow/Theme.
+//   ignore-case          bool        "Ignorar caixa". Idem, com set-ignore-case. O Rust deve
+//                                    reenviar `battery` com a caixa em -1.
+//   autostart            bool        "Iniciar com o sistema". Idem, com set-autostart. Se o
+//                                    sistema recusar, o Rust restaura o valor e dispara toast.
+//
+// ===== Callbacks de comando (interface chama; Rust implementa) =====
+//   set-noise(kind int, scene string, level int)   modo de ruído; o Rust aplica o debounce de 350 ms.
+//   set-eq-preset(index int)                       escolhe um preset.
+//   set-eq-gain(band int, db int)                  ganho de uma banda; o Rust cuida do clamp e do debounce.
+//   set-key(gesture int, action int)               gesto 1..6, ação de key-actions.value.
+//   set-game(on bool)  /  set-sleep(on bool)
+//   set-reduce-motion(on bool)  /  set-ignore-case(on bool)  /  set-autostart(on bool)
+//   rename(name string) -> bool                    true se aceito (a interface tira o foco do campo).
+//   enable-bluetooth()   wake-control()   connect-audio()
+//   open-url(url string)                           clique no crédito; o Rust abre no navegador.
+//
+// ===== Callback que o Rust dispara e a interface trata =====
+//   toast(text string, kind string)                kind: "error" ou "info". O Rust chama
+//                                                  `invoke_toast`; o handler interno do global
+//                                                  guarda toast-text/toast-kind e incrementa
+//                                                  toast-seq (a interface mostra o aviso).
+//
+// ===== Efeitos que o Rust precisa conhecer =====
+//   Atualização otimista: a interface não muda as propriedades `in` sozinha. O Rust atualiza
+//   a propriedade logo após o callback (como o bridge._optimistic) e depois confirma com o eco do fone.
+//   Janela e foco: MainWindow.live (in) deve ser true só com a janela visível, com foco e não
+//   minimizada. MainWindow expõe `in property <bool> live`; ela alimenta Theme.live.
+//   Fechar para a bandeja: o Rust trata. A janela (winit) emite CloseRequested; use
+//   `window.on_close_requested(|| { ...hide(); CloseRequestResponse::HideWindow })` quando
+//   tray-available for true e o app não estiver encerrando. A interface não declara
+//   `close-requested`.
+//   Altura da janela: ela ajusta a si mesma ao conteúdo (min = max = altura calculada).
+//   Largura fixa de 940 px.
+
+export struct Battery {
+    percent: int,
+    charging: bool,
+}
+
+export struct AncScene {
+    key: string,
+    label: string,
+}
+
+export struct KeyAction {
+    value: int,
+    label: string,
+}
+
+export global Backend {
+    // Estado do fone.
+    in property <bool> connected: false;
+    in property <string> status: "Procurando o fone…";
+    in property <string> name: "QCY HT05";
+    in property <string> firmware;
+    in property <string> address;
+    in property <[Battery]> battery: [
+        { percent: -1, charging: false },
+        { percent: -1, charging: false },
+        { percent: -1, charging: false },
+    ];
+    in property <int> noise-kind: -1;
+    in property <string> anc-scene: "noisy";
+    in property <int> anc-level: 3;
+    in property <int> trans-level: 4;
+    in property <string> noise-label;
+    in property <bool> game-mode: false;
+    in property <bool> sleep-mode: false;
+    in property <int> eq-preset: -1;
+    in property <[int]> eq-gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    in property <[int]> keys: [-1, -1, -1, -1, -1, -1];
+
+    // Preferências do app (a interface também altera).
+    in-out property <bool> reduce-motion: false;
+    in-out property <bool> ignore-case: false;
+    in-out property <bool> autostart: false;
+
+    // Constantes do app.
+    in property <string> app-name: "MeloBuds by @pedrohrqe";
+    in property <string> credit-url: "https://github.com/pedrohrqe";
+    in property <string> credit-text: "github.com/pedrohrqe";
+    in property <bool> tray-available: false;
+    in property <bool> audio-only: false;
+    in property <bool> bluetooth-on: true;
+    in property <bool> can-enable-bluetooth: false;
+
+    // Tabelas do protocolo.
+    in property <[string]> eq-bands: ["31", "62", "125", "250", "500", "1k", "2k", "4k", "8k", "16k"];
+    in property <[string]> eq-presets: ["Padrão", "Pop", "Graves", "Rock", "Suave", "Clássico"];
+    in property <[AncScene]> anc-scenes: [
+        { key: "indoor", label: "Interno" },
+        { key: "commute", label: "Transporte" },
+        { key: "noisy", label: "Ruidoso" },
+        { key: "wind", label: "Anti-vento" },
+    ];
+    in property <[KeyAction]> key-actions: [
+        { value: 0, label: "Nenhuma" },
+        { value: 1, label: "Play/Pausa" },
+        { value: 2, label: "Faixa anterior" },
+        { value: 3, label: "Próxima faixa" },
+        { value: 4, label: "Assistente de voz" },
+        { value: 5, label: "Volume +" },
+        { value: 6, label: "Volume −" },
+        { value: 7, label: "Modo jogo" },
+        { value: 11, label: "Alternar ANC" },
+    ];
+    in property <int> eq-min: -8;
+    in property <int> eq-max: 8;
+
+    // Comandos.
+    callback set-noise(int, string, int);
+    callback set-eq-preset(int);
+    callback set-eq-gain(int, int);
+    callback set-key(int, int);
+    callback set-game(bool);
+    callback set-sleep(bool);
+    callback set-reduce-motion(bool);
+    callback set-ignore-case(bool);
+    callback set-autostart(bool);
+    callback rename(string) -> bool;
+    callback enable-bluetooth();
+    callback wake-control();
+    callback connect-audio();
+    callback open-url(string);
+
+    // Disparado pelo Rust (invoke_toast); o próprio global guarda o aviso e incrementa
+    // toast-seq, e a janela mostra o aviso quando toast-seq muda.
+    callback toast(string, string);
+    in-out property <string> toast-text;
+    in-out property <string> toast-kind: "info";
+    in-out property <int> toast-seq: 0;
+    toast(text, kind) => {
+        toast-text = text;
+        toast-kind = kind;
+        toast-seq += 1;
+    }
+}

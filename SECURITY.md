@@ -15,6 +15,6 @@ O mantenedor responde em até 7 dias.
 
 ## Escopo
 
-- O app não usa rede. Ele só se comunica com o fone por Bluetooth e com o BlueZ por D-Bus.
+- O app não usa rede. Ele se comunica com o fone por Bluetooth e com o sistema local, como o BlueZ por D-Bus no Linux.
 - O comando `qcyctl dualboot` exige `sudo` e altera a chave de pareamento no BlueZ. Antes da mudança, ele faz uma cópia de segurança. Relate qualquer falha desse comando como vulnerabilidade.
 - O app não envia comandos de firmware (OTA) ao fone.

@@ -1,0 +1,98 @@
+import { Theme } from "theme.slint";
+import { Backend } from "backend.slint";
+import { Toggle } from "toggle.slint";
+import { Button } from "button.slint";
+import { Field } from "field.slint";
+import { FieldLabel } from "field-label.slint";
+import { InfoRow } from "info-row.slint";
+
+// Dispositivo: modos, nome Bluetooth, áudio e informações.
+export component DevicePanel inherits Rectangle {
+    preferred-height: col.preferred-height;
+
+    col := VerticalLayout {
+        alignment: start;
+        spacing: Theme.s1;
+        Toggle {
+            text: "Modo jogo";
+            hint: "Reduz o atraso do áudio. Pode diminuir o alcance.";
+            checked: Backend.game-mode;
+            toggled(on) => { Backend.set-game(on); }
+        }
+        Toggle {
+            text: "Modo sono";
+            hint: "Desativa os toques até você guardar os fones na caixa.";
+            checked: Backend.sleep-mode;
+            toggled(on) => { Backend.set-sleep(on); }
+        }
+        Rectangle { height: Theme.s2; }
+        FieldLabel { text: "Nome Bluetooth"; }
+        Rectangle { height: Theme.s1; }
+        HorizontalLayout {
+            spacing: Theme.s2;
+            name-field := Field {
+                text: Backend.name;
+                placeholder: "Nome do fone";
+                accepted => {
+                    if (Backend.rename(self.text)) { self.unfocus(); }
+                }
+            }
+            Button {
+                text: "Salvar";
+                primary: true;
+                enabled: name-field.text != "" && name-field.text != Backend.name;
+                clicked => {
+                    if (Backend.rename(name-field.text)) { name-field.unfocus(); }
+                }
+            }
+        }
+        Rectangle { height: Theme.s3; }
+        HorizontalLayout {
+            spacing: Theme.s3;
+            Button {
+                text: "Conectar áudio";
+                clicked => { Backend.connect-audio(); }
+            }
+            Text {
+                text: "Use se o som não sair pelo fone.";
+                wrap: word-wrap;
+                vertical-alignment: center;
+                font-family: Theme.family;
+                font-size: Theme.size-label + 1px;
+                color: Theme.text2;
+            }
+        }
+        Rectangle { height: Theme.s3; }
+        Toggle {
+            text: "Reduzir animações";
+            hint: "Troca os movimentos por transições curtas.";
+            checked: Backend.reduce-motion;
+            toggled(on) => {
+                Backend.reduce-motion = on;
+                Backend.set-reduce-motion(on);
+            }
+        }
+        Toggle {
+            text: "Ignorar caixa";
+            hint: "Esconde a caixa e descarta as informações dela.";
+            checked: Backend.ignore-case;
+            toggled(on) => {
+                Backend.ignore-case = on;
+                Backend.set-ignore-case(on);
+            }
+        }
+        Toggle {
+            text: "Iniciar com o sistema";
+            hint: "Abre o app na bandeja quando você entra no sistema.";
+            checked: Backend.autostart;
+            toggled(on) => {
+                Backend.autostart = on;
+                Backend.set-autostart(on);
+            }
+        }
+        Rectangle { height: Theme.s2; }
+        Rectangle { height: 1px; background: Theme.hairline; }
+        InfoRow { label: "Firmware"; value: Backend.firmware; }
+        InfoRow { label: "Endereço"; value: Backend.address; }
+    }
+}

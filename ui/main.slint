@@ -1,0 +1,429 @@
+import { Theme } from "theme.slint";
+import { Backend, Battery, AncScene, KeyAction } from "backend.slint";
+import { EarbudsHero } from "earbuds-hero.slint";
+import { NoisePanel } from "noise-panel.slint";
+import { BluetoothOff } from "bluetooth-off.slint";
+import { SegmentedControl } from "segmented-control.slint";
+import { EqPanel } from "eq-panel.slint";
+import { KeysPanel } from "keys-panel.slint";
+import { DevicePanel } from "device-panel.slint";
+import { Button } from "button.slint";
+import { Toast } from "toast.slint";
+import "fonts/Inter-Regular.ttf";
+import "fonts/Inter-Medium.ttf";
+import "fonts/Inter-SemiBold.ttf";
+import "fonts/InterDisplay-SemiBold.ttf";
+
+export { Backend, Battery, AncScene, KeyAction, Theme }
+
+// Painel de uma aba: entra com fade e um deslize curto na direção da troca.
+component Pane inherits Rectangle {
+    in property <int> index: 0;
+    in property <int> tab-index: 0;
+    in property <length> pane-w;
+    in property <length> pane-h;
+    property <bool> active: tab-index == index;
+    x: Theme.s4 + (Theme.reduce || active ? 0px : (index < tab-index ? -24px : 24px));
+    y: Theme.s4;
+    width: pane-w - 2 * Theme.s4;
+    height: pane-h - 2 * Theme.s4;
+    visible: self.opacity > 0;
+    opacity: active ? 1 : 0;
+    animate opacity { duration: Theme.d(active ? Theme.normal : Theme.fast); easing: Theme.out-cubic; }
+    animate x { duration: Theme.m(Theme.normal); easing: Theme.out-cubic; }
+    @children
+}
+
+export component MainWindow inherits Window {
+    // O Rust define: true só com a janela visível, em foco e não minimizada.
+    in property <bool> live <=> Theme.live;
+    // Altura que a janela precisa para o conteúdo (min = max = esta altura).
+    out property <length> fit-height: win-h;
+    // Aba aberta: 0 Equalizador, 1 Toques, 2 Dispositivo.
+    in-out property <int> tab-index: 0;
+
+    title: Backend.app-name;
+    background: Theme.bg;
+    default-font-family: Theme.family;
+    default-font-size: Theme.size-body;
+    preferred-width: 940px;
+    min-width: 940px;
+    max-width: 940px;
+    preferred-height: win-h;
+    min-height: win-h;
+    max-height: win-h;
+
+    // Sem rolagem: duas colunas. A altura da janela acompanha o conteúdo e
+    // reserva o espaço do maior painel, para não mudar ao trocar de aba.
+    property <length> col-gap: Theme.s5;
+    property <length> left-w: 400px;
+    property <length> right-w: 940px - 2 * Theme.s5 - col-gap - left-w;
+    // Altura natural da coluna esquerda: cabeçalho, herói, espaço e cartão de ruído.
+    property <length> left-h: 58px + Theme.s3 + 236px + Theme.s3 + Theme.s1
+        + (Backend.connected ? Theme.s3 + noise.preferred-height : 0px);
+    property <length> left-peak: 0px;
+    changed left-h => { if (left-h > left-peak) { left-peak = left-h; } }
+    property <length> right-need: Backend.connected
+        ? tabs.preferred-height + Theme.s3 + 2 * Theme.s4
+            + Math.max(eq-panel.chrome + 168px, Math.max(keys-panel.preferred-height, dev-panel.preferred-height))
+        : (Backend.bluetooth-on ? guide-h : bt-off.preferred-height);
+    property <length> content-need: Math.max(Math.max(left-peak, left-h) + 13px + Theme.s3, right-need);
+    property <length> win-h: Math.ceil(content-need / 1px) * 1px + 2 * Theme.s5;
+    property <length> guide-h: guide-col.preferred-height + 2 * Theme.s4;
+
+    // Entrada: ao conectar pela primeira vez, o cartão, as abas e o painel sobem com fade.
+    property <bool> entered: false;
+    property <bool> in-c0: false;
+    property <bool> in-tabs: false;
+    property <bool> in-panel: false;
+    property <bool> conn: Backend.connected;
+    property <bool> was-connected: false;
+    changed conn => {
+        if (conn && !was-connected) {
+            was-connected = true;
+            sweep-delay.running = true;
+            if (!entered) {
+                entered = true;
+                if (Theme.reduce) {
+                    in-c0 = true;
+                    in-tabs = true;
+                    in-panel = true;
+                } else {
+                    in-c0 = true;
+                    enter-tabs.running = true;
+                    enter-panel.running = true;
+                }
+            }
+        } else if (!conn) {
+            was-connected = false;
+        }
+    }
+    sweep-delay := Timer {
+        interval: 250ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            hero.sweep();
+        }
+    }
+    enter-tabs := Timer {
+        interval: 60ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            in-tabs = true;
+        }
+    }
+    enter-panel := Timer {
+        interval: 120ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            in-panel = true;
+        }
+    }
+
+    // O Rust dispara Backend.toast; o global registra texto e tipo e incrementa toast-seq.
+    property <int> toast-seq: Backend.toast-seq;
+    changed toast-seq => { toast-w.show(Backend.toast-text, Backend.toast-kind); }
+
+    // ---- coluna esquerda ----
+    left := Rectangle {
+        x: Theme.s5;
+        y: Theme.s5;
+        width: left-w;
+        height: left-h;
+
+        // Cabeçalho: nome do fone e estado.
+        Text {
+            x: 0;
+            y: 0;
+            width: parent.width;
+            text: Backend.connected ? Backend.name : "QCY HT05";
+            overflow: elide;
+            font-family: Theme.display;
+            font-weight: 600;
+            font-size: Theme.size-title;
+            letter-spacing: -0.4px;
+            color: Theme.text;
+        }
+        property <duration> dot-clock: Backend.connected || !Backend.bluetooth-on ? 0ms : Theme.tick();
+        dot := Rectangle {
+            x: 0;
+            y: 35px + (16px - 8px) / 2 + 1px;
+            width: 8px;
+            height: 8px;
+            border-radius: 4px;
+            background: !Backend.bluetooth-on ? Theme.bad : (Backend.connected ? Theme.ok : Theme.warn);
+            animate background { duration: Theme.d(Theme.normal); }
+            // Pulso do ponto de estado: 1 -> 0,3 -> 1 (período 1400 ms).
+            opacity: (!Backend.connected && Backend.bluetooth-on && Theme.loop)
+                ? 0.65 + 0.35 * Math.cos(Math.mod(parent.dot-clock / 1400ms, 1) * 360deg) : 1;
+        }
+        Text {
+            x: 16px;
+            y: 35px + 1px;
+            width: parent.width - 16px;
+            height: 16px;
+            vertical-alignment: center;
+            text: Backend.status;
+            overflow: elide;
+            font-size: Theme.size-body;
+            color: Theme.text2;
+        }
+
+        hero := EarbudsHero {
+            x: 0;
+            y: 58px + Theme.s3;
+            width: parent.width;
+            height: 236px;
+            connected: Backend.connected;
+            show-case: !Backend.ignore-case;
+            battery: Backend.battery;
+            noise-kind: Backend.connected ? Backend.noise-kind : -1;
+            noise-level: Backend.noise-kind == 1 ? Backend.anc-level : Backend.trans-level;
+        }
+
+        noise := NoisePanel {
+            x: 0;
+            y: 58px + Theme.s3 + 236px + Theme.s3 + Theme.s1 + Theme.s3 + (in-c0 ? 0px : 16px);
+            width: parent.width;
+            height: self.preferred-height;
+            visible: Backend.connected && self.opacity > 0;
+            opacity: in-c0 ? 1 : 0;
+            animate opacity { duration: Theme.m(Theme.normal); easing: Theme.out-cubic; }
+            animate y { duration: Theme.m(Theme.normal); easing: Theme.out-cubic; }
+        }
+    }
+
+    // ---- coluna direita ----
+    right := Rectangle {
+        x: Theme.s5 + left-w + col-gap;
+        y: Theme.s5;
+        width: right-w;
+        height: content-need;
+
+        // Desconectado: instruções.
+        guide := Rectangle {
+            x: 0;
+            y: 0;
+            width: parent.width;
+            height: guide-h;
+            visible: self.opacity > 0;
+            // Espera o aviso de Bluetooth sair, para os dois textos não se sobreporem.
+            opacity: Backend.connected || bt-off.visible ? 0 : 1;
+            animate opacity { duration: Theme.d(Theme.normal); }
+            border-radius: Theme.radius;
+            background: Theme.surface;
+            border-width: 1px;
+            border-color: Theme.hairline;
+            guide-col := VerticalLayout {
+                x: Theme.s4;
+                y: Theme.s4;
+                width: parent.width - 2 * Theme.s4;
+                alignment: start;
+                spacing: Theme.s3;
+                Text {
+                    text: Backend.audio-only ? "Fone conectado ao sistema" : "Conectando ao fone";
+                    font-family: Theme.family;
+                    font-size: Theme.size-heading;
+                    font-weight: 600;
+                    color: Theme.text;
+                }
+                for step[i] in (Backend.audio-only ? [
+                    "O áudio funciona. O fone só libera os controles por cerca de 1 minuto depois de conectar.",
+                    "Para usar os controles agora, ative-os abaixo. O Bluetooth do computador reinicia por alguns segundos.",
+                    "Ou guarde os fones na caixa e tire de novo com este app aberto.",
+                ] : [
+                    "Tire os fones da caixa e coloque nos ouvidos.",
+                    "Deixe este app aberto: ele conecta os controles e o áudio.",
+                    "Primeira vez? Coloque o fone em modo de pareamento (veja o manual do fone) e deixe esta janela aberta.",
+                ]): Rectangle {
+                    preferred-height: Math.max(22px, st.preferred-height);
+                    Rectangle {
+                        x: 0;
+                        y: 0;
+                        width: 22px;
+                        height: 22px;
+                        border-radius: 11px;
+                        background: Theme.surface-hi;
+                        border-width: 1px;
+                        border-color: Theme.edge-light;
+                        Text {
+                            text: i + 1;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                            font-family: Theme.family;
+                            font-size: Theme.size-label;
+                            font-weight: 600;
+                            color: Theme.accent;
+                        }
+                    }
+                    // Largura explícita: o Text só calcula a altura de quebra com a largura conhecida.
+                    // y -2 px: o QML não põe entrelinha acima da primeira linha.
+                    st := Text {
+                        x: 22px + Theme.s3;
+                        y: -2px;
+                        width: right-w - 2 * Theme.s4 - 22px - Theme.s3;
+                        wrap: word-wrap;
+                        text: step;
+                        line-height-factor: 1.3;
+                        font-family: Theme.family;
+                        font-size: Theme.size-body;
+                        color: Theme.text2;
+                    }
+                }
+                if Backend.audio-only: HorizontalLayout {
+                    alignment: start;
+                    Button {
+                        text: "Ativar controles";
+                        primary: true;
+                        clicked => { Backend.wake-control(); }
+                    }
+                }
+            }
+        }
+
+        // Bluetooth do sistema desligado: aviso no lugar das instruções.
+        bt-off := BluetoothOff {
+            x: 0;
+            y: 0;
+            width: parent.width;
+            height: self.preferred-height;
+            off: !Backend.bluetooth-on;
+            can-enable: Backend.can-enable-bluetooth;
+            enable-requested => { Backend.enable-bluetooth(); }
+        }
+
+        // Conectado: abas e um painel único, sempre aberto.
+        tabs := SegmentedControl {
+            x: 0;
+            y: in-tabs ? 0px : 16px;
+            width: parent.width;
+            height: Theme.control;
+            visible: Backend.connected && self.opacity > 0;
+            opacity: in-tabs ? 1 : 0;
+            animate opacity { duration: Theme.m(Theme.normal); easing: Theme.out-cubic; }
+            animate y { duration: Theme.m(Theme.normal); easing: Theme.out-cubic; }
+            options: ["Equalizador", "Toques", "Dispositivo"];
+            current: tab-index;
+            picked(i) => { tab-index = i; }
+        }
+        panel := Rectangle {
+            x: 0;
+            y: Theme.control + Theme.s3 + (in-panel ? 0px : 16px);
+            width: parent.width;
+            height: parent.height - (Theme.control + Theme.s3);
+            visible: Backend.connected && self.opacity > 0;
+            opacity: in-panel ? 1 : 0;
+            animate opacity { duration: Theme.m(Theme.normal); easing: Theme.out-cubic; }
+            animate y { duration: Theme.m(Theme.normal); easing: Theme.out-cubic; }
+            border-radius: Theme.radius;
+            background: Theme.surface;
+            border-width: 1px;
+            border-color: Theme.hairline;
+            clip: true;
+            // Luz na borda superior do material.
+            Rectangle {
+                x: Theme.radius;
+                y: 0;
+                width: parent.width - 2 * Theme.radius;
+                height: 1px;
+                background: Theme.edge-light;
+            }
+            Pane {
+                index: 0;
+                tab-index: root.tab-index;
+                pane-w: panel.width;
+                pane-h: panel.height;
+                eq-panel := EqPanel {
+                    width: parent.width;
+                    height: parent.height;
+                    avail-h: parent.height;
+                }
+            }
+            Pane {
+                index: 1;
+                tab-index: root.tab-index;
+                pane-w: panel.width;
+                pane-h: panel.height;
+                keys-panel := KeysPanel {
+                    width: parent.width;
+                    height: parent.height;
+                }
+            }
+            Pane {
+                index: 2;
+                tab-index: root.tab-index;
+                pane-w: panel.width;
+                pane-h: panel.height;
+                dev-panel := DevicePanel {
+                    width: parent.width;
+                    height: parent.height;
+                }
+            }
+        }
+    }
+
+    // Crédito: nome do app e link do autor, no rodapé da coluna esquerda.
+    credit := Rectangle {
+        x: Theme.s5;
+        y: root.height - self.height - Theme.s5;
+        width: name-t.preferred-width + Theme.s1 + link-t.preferred-width;
+        height: 14px;
+        name-t := Text {
+            x: 0;
+            height: parent.height;
+            vertical-alignment: center;
+            text: Backend.app-name + " ·";
+            font-family: Theme.family;
+            font-size: Theme.size-label;
+            color: Theme.text2;
+        }
+        link-t := Text {
+            x: name-t.preferred-width + Theme.s1;
+            height: parent.height;
+            vertical-alignment: center;
+            text: Backend.credit-text;
+            font-family: Theme.family;
+            font-size: Theme.size-label;
+            color: (link-ta.has-hover || link-fs.has-focus) ? Theme.accent : Theme.text2;
+            animate color { duration: Theme.d(Theme.fast); }
+        }
+        // Sublinhado no hover ou foco (o Text do Slint não tem underline).
+        Rectangle {
+            x: link-t.x;
+            y: parent.height - 2px;
+            width: link-t.preferred-width;
+            height: 1px;
+            background: Theme.accent;
+            visible: link-ta.has-hover || link-fs.has-focus;
+        }
+        link-fs := FocusScope {
+            x: link-t.x;
+            y: 0;
+            width: link-t.preferred-width;
+            height: parent.height;
+            key-pressed(e) => {
+                if (e.text == Key.Return || e.text == " ") {
+                    Backend.open-url(Backend.credit-url);
+                    return accept;
+                }
+                return reject;
+            }
+        }
+        link-ta := TouchArea {
+            x: link-t.x - 6px;
+            y: -6px;
+            width: link-t.preferred-width + 12px;
+            height: parent.height + 12px;
+            mouse-cursor: pointer;
+            clicked => { Backend.open-url(Backend.credit-url); }
+        }
+    }
+
+    toast-w := Toast {
+        host-w: root.width;
+        host-h: root.height;
+    }
+}

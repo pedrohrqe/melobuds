@@ -1,0 +1,51 @@
+import { Theme } from "theme.slint";
+import { FocusRing } from "focus-ring.slint";
+
+// Botão. "primary" usa o acento; o padrão é neutro.
+export component Button inherits Rectangle {
+    in property <string> text;
+    in property <bool> primary: false;
+    in property <bool> enabled: true;
+    callback clicked();
+    horizontal-stretch: 0;
+    max-width: label.preferred-width + 2 * Theme.s4;
+    preferred-width: label.preferred-width + 2 * Theme.s4;
+    preferred-height: Theme.control;
+    border-radius: Theme.radius-sm;
+    opacity: enabled ? 1 : 0.4;
+    background: primary ? (ta.pressed ? Theme.accent.darker(0.15) : Theme.accent)
+        : (ta.pressed ? Theme.surface-press : (ta.has-hover ? Theme.surface-hi : Theme.bg));
+    border-width: primary ? 0px : 1px;
+    border-color: Theme.edge-light;
+    animate background { duration: Theme.d(Theme.fast); }
+
+    fs := FocusScope {
+        // O anel de foco só aparece na navegação por teclado, nunca depois de um clique.
+        property <bool> kb: false;
+        focus-gained(reason) => { self.kb = reason == FocusReason.tab-navigation; }
+        focus-lost(reason) => { self.kb = false; }
+        enabled: root.enabled;
+        key-pressed(e) => {
+            if (e.text == " " || e.text == Key.Return) {
+                root.clicked();
+                return accept;
+            }
+            return reject;
+        }
+    }
+    label := Text {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        text: root.text;
+        font-family: Theme.family;
+        font-size: Theme.size-body;
+        font-weight: 600;
+        color: root.primary ? Theme.accent-ink : Theme.text;
+    }
+    ta := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+    FocusRing { show: fs.has-focus && fs.kb; r: Theme.radius-sm; w: parent.width; h: parent.height; }
+}

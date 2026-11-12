@@ -1,0 +1,51 @@
+import { Theme } from "theme.slint";
+
+// Cartão com cabeçalho (título e resumo à direita). Aqui só a variante fixa
+// (expandable: false), a única que o app usa: o conteúdo fica sempre aberto.
+export component Card inherits Rectangle {
+    in property <string> title;
+    in property <string> value;            // resumo à direita do título
+    property <length> header-height: 52px;
+    preferred-height: header-height + body.preferred-height + Theme.s4;
+    border-radius: Theme.radius;
+    background: Theme.surface;
+    border-width: 1px;
+    border-color: Theme.hairline;
+
+    // Luz na borda superior do material.
+    Rectangle {
+        x: Theme.radius;
+        y: 0;
+        width: parent.width - 2 * Theme.radius;
+        height: 1px;
+        background: Theme.edge-light;
+    }
+    Text {
+        x: Theme.s4;
+        y: 0;
+        height: root.header-height;
+        text: root.title;
+        vertical-alignment: center;
+        font-family: Theme.family;
+        font-size: Theme.size-heading;
+        font-weight: 600;
+        color: Theme.text;
+    }
+    Text {
+        x: parent.width - self.width - Theme.s4;
+        y: 0;
+        height: root.header-height;
+        text: root.value;
+        vertical-alignment: center;
+        font-family: Theme.family;
+        font-size: Theme.size-body;
+        color: Theme.text2;
+    }
+    body := VerticalLayout {
+        x: Theme.s4;
+        y: root.header-height;
+        width: parent.width - 2 * Theme.s4;
+        alignment: start;
+        @children
+    }
+}

@@ -1,0 +1,62 @@
+import { Theme } from "theme.slint";
+
+// Aviso no rodapé. Entra de baixo e sai pelo mesmo caminho.
+export component Toast inherits Rectangle {
+    property <string> kind: "info";
+    in property <length> host-w;
+    in property <length> host-h;
+    property <string> message;
+    property <bool> shown: false;
+
+    public function show(text: string, k: string) {
+        message = text;
+        kind = k;
+        shown = true;
+        timer.running = false;
+        timer.running = true;
+    }
+
+    width: Math.min(host-w - 2 * Theme.s5, 380px);
+    height: msg.preferred-height + 2 * Theme.s3;
+    x: (host-w - self.width) / 2;
+    y: shown ? host-h - self.height - Theme.s5 : host-h + 8px;
+    opacity: shown ? 1 : 0;
+    visible: self.opacity > 0;
+    border-radius: Theme.radius;
+    background: Theme.surface-hi;
+    border-width: 1px;
+    border-color: kind == "error" ? Theme.bad : Theme.edge-light;
+    animate y { duration: Theme.m(Theme.normal); easing: Theme.out-cubic; }
+    animate opacity { duration: Theme.d(Theme.fast); }
+
+    timer := Timer {
+        interval: root.kind == "error" ? 6000ms : 4000ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            root.shown = false;
+        }
+    }
+    Text {
+        x: Theme.s4;
+        y: (parent.height - self.height) / 2;
+        width: 18px;
+        horizontal-alignment: center;
+        text: root.kind == "error" ? "⚠" : "✓";
+        font-family: Theme.family;
+        font-size: 16px;
+        font-weight: 600;
+        color: root.kind == "error" ? Theme.bad : Theme.accent;
+    }
+    msg := Text {
+        x: Theme.s4 + 18px + Theme.s3;
+        y: (parent.height - self.height) / 2;
+        width: host-w - self.x - Theme.s4;
+        wrap: word-wrap;
+        text: root.message;
+        font-family: Theme.family;
+        font-size: Theme.size-body;
+        color: Theme.text;
+    }
+    TouchArea { clicked => { root.shown = false; } }
+}

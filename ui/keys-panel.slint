@@ -1,0 +1,55 @@
+import { Theme } from "theme.slint";
+import { Backend } from "backend.slint";
+import { Select } from "select.slint";
+
+// Toques: uma ação para cada gesto em cada lado.
+export component KeysPanel inherits Rectangle {
+    preferred-height: col.preferred-height;
+    // Gesto do lado esquerdo e direito de cada linha (1..6).
+    property <[{title: string, l: int, r: int}]> rows: [
+        { title: "Toque", l: 1, r: 2 },
+        { title: "Toque duplo", l: 3, r: 4 },
+        { title: "Toque triplo", l: 5, r: 6 },
+    ];
+
+    function action(g: int) -> int {
+        return Backend.keys.length >= g ? Backend.keys[g - 1] : -1;
+    }
+
+    col := VerticalLayout {
+        alignment: start;
+        spacing: Theme.s3;
+        for row in rows: VerticalLayout {
+            spacing: Theme.s1 + 2px;
+            Text {
+                text: row.title;
+                font-family: Theme.family;
+                font-size: Theme.size-body;
+                font-weight: 500;
+                color: Theme.text;
+            }
+            HorizontalLayout {
+                spacing: Theme.s2;
+                Select {
+                    model: Backend.key-actions;
+                    prefix: "E";
+                    current-value: root.action(row.l);
+                    activated(v) => { Backend.set-key(row.l, v); }
+                }
+                Select {
+                    model: Backend.key-actions;
+                    prefix: "D";
+                    current-value: root.action(row.r);
+                    activated(v) => { Backend.set-key(row.r, v); }
+                }
+            }
+        }
+        Text {
+            wrap: word-wrap;
+            text: "E = fone esquerdo, D = fone direito. Em chamadas, os gestos são fixos: toque duplo atende ou desliga; segurar 1,5 s recusa.";
+            font-family: Theme.family;
+            font-size: Theme.size-label + 1px;
+            color: Theme.text2;
+        }
+    }
+}

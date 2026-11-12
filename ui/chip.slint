@@ -1,0 +1,47 @@
+import { Theme } from "theme.slint";
+import { FocusRing } from "focus-ring.slint";
+
+// Opção em pílula (presets de EQ, cenas de ANC).
+export component Chip inherits Rectangle {
+    in property <string> text;
+    in property <bool> checked: false;
+    callback clicked();
+    horizontal-stretch: 0;
+    max-width: label.preferred-width + 2 * Theme.s3;
+    preferred-width: label.preferred-width + 2 * Theme.s3;
+    preferred-height: 30px;
+    border-radius: self.height / 2;
+    background: checked ? Theme.accent-soft : (ta.has-hover ? Theme.surface-hi : transparent);
+    border-width: 1px;
+    border-color: checked ? Theme.accent : Theme.hairline;
+    animate background { duration: Theme.d(Theme.fast); }
+    animate border-color { duration: Theme.d(Theme.fast); }
+
+    fs := FocusScope {
+        // O anel de foco só aparece na navegação por teclado, nunca depois de um clique.
+        property <bool> kb: false;
+        focus-gained(reason) => { self.kb = reason == FocusReason.tab-navigation; }
+        focus-lost(reason) => { self.kb = false; }
+        key-pressed(e) => {
+            if (e.text == " " || e.text == Key.Return) {
+                root.clicked();
+                return accept;
+            }
+            return reject;
+        }
+    }
+    label := Text {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        text: root.text;
+        font-family: Theme.family;
+        font-size: Theme.size-body;
+        font-weight: root.checked ? 600 : 500;
+        color: root.checked ? Theme.accent : Theme.text2;
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+    FocusRing { show: fs.has-focus && fs.kb; r: root.height / 2 - 3px; w: parent.width; h: parent.height; }
+}

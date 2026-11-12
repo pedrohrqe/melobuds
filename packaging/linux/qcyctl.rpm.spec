@@ -1,4 +1,4 @@
-# RPM a partir dos binários do PyInstaller (dist/qcyctl). Gerado por build-packages.sh.
+# RPM a partir dos binários do cargo (dist/qcyctl). Gerado por build-packages.sh.
 %global debug_package %{nil}
 %global __strip /bin/true
 %global __requires_exclude_from ^/opt/qcyctl/.*$
@@ -11,7 +11,7 @@ Summary:        Controle do fone QCY HT05 (ANC, EQ, toques, bateria)
 License:        MIT
 BuildArch:      x86_64
 AutoReqProv:    no
-Requires:       libstdc++ libgcc mesa-libgbm
+Requires:       fontconfig libxkbcommon
 
 %description
 Controle do fone QCY HT05 (MeloBuds ANC): ANC, transparência, equalizador,

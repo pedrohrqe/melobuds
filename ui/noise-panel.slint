@@ -1,0 +1,74 @@
+import { Theme } from "theme.slint";
+import { Backend, AncScene } from "backend.slint";
+import { Card } from "card.slint";
+import { SegmentedControl } from "segmented-control.slint";
+import { Chip } from "chip.slint";
+import { FieldLabel } from "field-label.slint";
+import { StepSlider } from "step-slider.slint";
+import { Toggle } from "toggle.slint";
+
+// Modo de ruído: Normal, ANC (cena + intensidade) ou Transparência (nível ou voz).
+export component NoisePanel inherits Card {
+    title: "Ruído";
+    value: Backend.noise-label;
+
+    VerticalLayout {
+        spacing: Theme.s3;
+        SegmentedControl {
+            options: ["Normal", "ANC", "Transparência"];
+            current: Backend.noise-kind;
+            picked(i) => {
+                if (i == 1) { Backend.set-noise(1, Backend.anc-scene, Backend.anc-level); }
+                else if (i == 2) { Backend.set-noise(2, "", Backend.trans-level); }
+                else { Backend.set-noise(0, "", 0); }
+            }
+        }
+        // ANC
+        if Backend.noise-kind == 1: VerticalLayout {
+            spacing: Theme.s2;
+            FieldLabel { text: "Ambiente"; }
+            // Mesma largura dos controles de ruído e de intensidade. O protocolo tem 4 cenas.
+            SegmentedControl {
+                property <[AncScene]> sc: Backend.anc-scenes;
+                options: [sc[0].label, sc[1].label, sc[2].label, sc[3].label];
+                current: sc[0].key == Backend.anc-scene ? 0 : sc[1].key == Backend.anc-scene ? 1 : sc[2].key == Backend.anc-scene ? 2 : sc[3].key == Backend.anc-scene ? 3 : -1;
+                picked(i) => { Backend.set-noise(1, sc[i].key, Backend.anc-level); }
+            }
+            Rectangle { height: Theme.s1; }
+            if Backend.anc-scene != "wind": FieldLabel { text: "Intensidade"; }
+            if Backend.anc-scene != "wind": SegmentedControl {
+                options: ["Leve", "Média", "Forte"];
+                current: Backend.anc-level - 1;
+                picked(i) => { Backend.set-noise(1, Backend.anc-scene, i + 1); }
+            }
+        }
+        // Transparência
+        if Backend.noise-kind == 2: VerticalLayout {
+            spacing: Theme.s2;
+            HorizontalLayout {
+                FieldLabel { text: "Nível"; }
+                Text {
+                    horizontal-alignment: right;
+                    text: Backend.trans-level == 0 ? "Voz" : Backend.trans-level + " de 6";
+                    font-family: Theme.family;
+                    font-size: Theme.size-label + 1px;
+                    color: Theme.text;
+                }
+            }
+            StepSlider {
+                from: 1;
+                to: 6;
+                enabled: Backend.trans-level != 0;
+                opacity: self.enabled ? 1 : 0.4;
+                value: Backend.trans-level == 0 ? 4 : Backend.trans-level;
+                moved(v) => { Backend.set-noise(2, "", v); }
+            }
+            Toggle {
+                text: "Realçar voz";
+                hint: "Destaca a fala de quem está perto e reduz o resto.";
+                checked: Backend.trans-level == 0;
+                toggled(on) => { Backend.set-noise(2, "", on ? 0 : 4); }
+            }
+        }
+    }
+}
