@@ -20,6 +20,7 @@ Window {
     }
 
     Binding { target: Theme; property: "reduce"; value: backend.reduceMotion }
+    Binding { target: Theme; property: "live"; value: win.visible && win.active && win.visibility !== Window.Minimized }
 
     FontLoader { source: "Qcy/fonts/Inter-Regular.ttf" }
     FontLoader { source: "Qcy/fonts/Inter-Medium.ttf" }
@@ -95,7 +96,7 @@ Window {
                         color: !backend.bluetoothOn ? Theme.bad : (backend.connected ? Theme.ok : Theme.warn)
                         Behavior on color { ColorAnimation { duration: Theme.d(Theme.normal) } }
                         SequentialAnimation on opacity {
-                            running: !backend.connected && backend.bluetoothOn && !Theme.reduce
+                            running: !backend.connected && backend.bluetoothOn && Theme.loop
                             loops: Animation.Infinite
                             alwaysRunToEnd: true
                             NumberAnimation { to: 0.3; duration: 700; easing.type: Easing.InOutSine }

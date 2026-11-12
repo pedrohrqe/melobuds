@@ -41,7 +41,7 @@ Item {
             y: parent.height * 0.62
             color: root.charging ? Theme.accent : "#2A2F36"
             SequentialAnimation on opacity {
-                running: root.charging && !Theme.reduce
+                running: root.charging && Theme.loop
                 loops: Animation.Infinite
                 alwaysRunToEnd: true
                 NumberAnimation { to: 0.35; duration: 1400; easing.type: Easing.InOutSine }

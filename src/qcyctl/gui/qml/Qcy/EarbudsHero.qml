@@ -33,7 +33,7 @@ Item {
         color: "transparent"
         border.color: Theme.accent
         border.width: 1
-        visible: !root.connected && !Theme.reduce
+        visible: !root.connected && Theme.loop
         SequentialAnimation on scale {
             running: searchRing.visible
             loops: Animation.Infinite

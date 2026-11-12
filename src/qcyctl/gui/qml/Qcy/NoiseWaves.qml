@@ -10,7 +10,7 @@ Item {
     property int kind: -1             // NoiseKind: 0 normal, 1 ANC, 2 transparência
     property int level: 3
     property bool active: true
-    readonly property bool moving: active && !Theme.reduce && (kind === 1 || kind === 2)
+    readonly property bool moving: active && Theme.loop && (kind === 1 || kind === 2)
     readonly property int period: kind === 2 ? 3400 - level * 220 : 3000
 
     Repeater {

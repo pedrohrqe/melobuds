@@ -27,6 +27,37 @@ class ClassicStatus:
     connected: bool = False
 
 
+_shared: tuple | None = None  # (loop, bus): uma conexão D-Bus por laço asyncio
+
+
+async def _bus():
+    """Conexão com o barramento de sistema, reaproveitada entre as chamadas.
+
+    Abrir uma conexão nova a cada consulta custa CPU (autenticação e introspecção).
+    """
+    global _shared
+    from dbus_fast import BusType
+    from dbus_fast.aio import MessageBus
+
+    loop = asyncio.get_running_loop()
+    if _shared and _shared[0] is loop and _shared[1].connected:
+        return _shared[1]
+    bus = await MessageBus(bus_type=BusType.SYSTEM).connect()
+    _shared = (loop, bus)
+    return bus
+
+
+async def _get(bus, path: str, iface: str, prop: str):
+    """Lê uma propriedade sem introspecção. Lança DBusError se o objeto não existe."""
+    from dbus_fast import DBusError, Message, MessageType
+
+    reply = await bus.call(Message(destination=BLUEZ, path=path, interface=PROPS_IFACE,
+                                   member="Get", signature="ss", body=[iface, prop]))
+    if reply.message_type == MessageType.ERROR:
+        raise DBusError(reply.error_name, (reply.body or [""])[0], reply)
+    return reply.body[0].value
+
+
 def _path(mac: str, adapter: str = "hci0") -> str:
     return f"/org/bluez/{adapter}/dev_{mac.upper().replace(':', '_')}"
 
@@ -48,18 +79,15 @@ async def _device(bus, mac: str):
 async def status(mac: str) -> ClassicStatus:
     if not SUPPORTED:
         return ClassicStatus(known=False)
-    from dbus_fast import BusType
-    from dbus_fast.aio import MessageBus
+    from dbus_fast import DBusError
 
-    bus = await MessageBus(bus_type=BusType.SYSTEM).connect()
+    bus = await _bus()
     try:
-        dev = await _device(bus, mac)
-        if dev is None:
-            return ClassicStatus(known=False)
-        d, _ = dev
-        return ClassicStatus(True, await d.get_paired(), await d.get_connected())
-    finally:
-        bus.disconnect()
+        paired = await _get(bus, _path(mac), DEVICE_IFACE, "Paired")
+        connected = await _get(bus, _path(mac), DEVICE_IFACE, "Connected")
+    except DBusError:
+        return ClassicStatus(known=False)  # o BlueZ não conhece este MAC
+    return ClassicStatus(True, bool(paired), bool(connected))
 
 
 async def disconnect(mac: str) -> bool:
@@ -70,18 +98,12 @@ async def disconnect(mac: str) -> bool:
     """
     if not SUPPORTED:
         return False
-    from dbus_fast import BusType
-    from dbus_fast.aio import MessageBus
-
-    bus = await MessageBus(bus_type=BusType.SYSTEM).connect()
-    try:
-        dev = await _device(bus, mac)
-        if dev is None or not await dev[0].get_connected():
-            return False
-        await dev[0].call_disconnect()
-        return True
-    finally:
-        bus.disconnect()
+    bus = await _bus()
+    dev = await _device(bus, mac)
+    if dev is None or not await dev[0].get_connected():
+        return False
+    await dev[0].call_disconnect()
+    return True
 
 
 ADAPTER_PATH = "/org/bluez/hci0"
@@ -92,35 +114,26 @@ async def adapter_powered() -> bool | None:
     """Estado do Bluetooth do sistema. None = desconhecido (fora do Linux, sem D-Bus)."""
     if not SUPPORTED:
         return None
-    from dbus_fast import BusType, DBusError
-    from dbus_fast.aio import MessageBus
+    from dbus_fast import DBusError
 
     try:
-        bus = await MessageBus(bus_type=BusType.SYSTEM).connect()
+        bus = await _bus()
     except Exception:  # noqa: BLE001 - sem barramento de sistema
         return None
     try:
-        intro = await bus.introspect(BLUEZ, ADAPTER_PATH)
-        props = bus.get_proxy_object(BLUEZ, ADAPTER_PATH, intro).get_interface(PROPS_IFACE)
-        return bool((await props.call_get(ADAPTER_IFACE, "Powered")).value)
+        return bool(await _get(bus, ADAPTER_PATH, ADAPTER_IFACE, "Powered"))
     except DBusError:
         return False  # sem adaptador, ou o serviço Bluetooth parado
-    finally:
-        bus.disconnect()
 
 
 async def set_powered(on: bool) -> None:
     """Liga ou desliga o Bluetooth do sistema. Lança DBusError se o sistema recusa."""
-    from dbus_fast import BusType, Variant
-    from dbus_fast.aio import MessageBus
+    from dbus_fast import Variant
 
-    bus = await MessageBus(bus_type=BusType.SYSTEM).connect()
-    try:
-        intro = await bus.introspect(BLUEZ, ADAPTER_PATH)
-        props = bus.get_proxy_object(BLUEZ, ADAPTER_PATH, intro).get_interface(PROPS_IFACE)
-        await props.call_set(ADAPTER_IFACE, "Powered", Variant("b", on))
-    finally:
-        bus.disconnect()
+    bus = await _bus()
+    intro = await bus.introspect(BLUEZ, ADAPTER_PATH)
+    props = bus.get_proxy_object(BLUEZ, ADAPTER_PATH, intro).get_interface(PROPS_IFACE)
+    await props.call_set(ADAPTER_IFACE, "Powered", Variant("b", on))
 
 
 A2DP_SINK = "0000110b-0000-1000-8000-00805f9b34fb"
@@ -150,37 +163,33 @@ async def ensure_connected(mac: str) -> str:
     """Pareia (se preciso), confia e conecta o áudio. Retorna uma descrição do resultado."""
     if not SUPPORTED:
         return "não suportado"
-    from dbus_fast import BusType, DBusError, Variant
-    from dbus_fast.aio import MessageBus
+    from dbus_fast import DBusError, Variant
 
-    bus = await MessageBus(bus_type=BusType.SYSTEM).connect()
-    try:
-        dev = await _device(bus, mac)
-        if dev is None:
-            return "o BlueZ não conhece o fone. Coloque o fone em modo de pareamento."
-        d, props = dev
-        if await d.get_connected():
-            return "conectado"
-        try:
-            if not await d.get_paired():
-                log.info("pareando %s", mac)
-                await d.call_pair()
-            await props.call_set(DEVICE_IFACE, "Trusted", Variant("b", True))
-            await _connect_audio(d)
-        except DBusError as exc:
-            log.info("falha no áudio %s: %s", mac, exc)
-            # A falha pode ser uma colisão com a conexão que o próprio fone iniciou.
-            # Espera essa conexão terminar antes de declarar o erro.
-            for _ in range(3):
-                await asyncio.sleep(1)
-                if await d.get_connected():
-                    return "conectado"
-            if "AuthenticationFailed" in exc.type or "AuthenticationRejected" in exc.type:
-                return "o fone recusou o pareamento. Coloque o fone em modo de pareamento."
-            return f"falha ao conectar o áudio: {exc.text or exc.type}"
+    bus = await _bus()
+    dev = await _device(bus, mac)
+    if dev is None:
+        return "o BlueZ não conhece o fone. Coloque o fone em modo de pareamento."
+    d, props = dev
+    if await d.get_connected():
         return "conectado"
-    finally:
-        bus.disconnect()
+    try:
+        if not await d.get_paired():
+            log.info("pareando %s", mac)
+            await d.call_pair()
+        await props.call_set(DEVICE_IFACE, "Trusted", Variant("b", True))
+        await _connect_audio(d)
+    except DBusError as exc:
+        log.info("falha no áudio %s: %s", mac, exc)
+        # A falha pode ser uma colisão com a conexão que o próprio fone iniciou.
+        # Espera essa conexão terminar antes de declarar o erro.
+        for _ in range(3):
+            await asyncio.sleep(1)
+            if await d.get_connected():
+                return "conectado"
+        if "AuthenticationFailed" in exc.type or "AuthenticationRejected" in exc.type:
+            return "o fone recusou o pareamento. Coloque o fone em modo de pareamento."
+        return f"falha ao conectar o áudio: {exc.text or exc.type}"
+    return "conectado"
 
 
 async def reconnect(mac: str) -> bool:
@@ -192,32 +201,28 @@ async def reconnect(mac: str) -> bool:
     """
     if not SUPPORTED:
         return False
-    from dbus_fast import BusType, DBusError, Variant
-    from dbus_fast.aio import MessageBus
+    from dbus_fast import DBusError, Variant
 
-    bus = await MessageBus(bus_type=BusType.SYSTEM).connect()
+    bus = await _bus()
+    adapter = "/org/bluez/hci0"
+    intro = await bus.introspect(BLUEZ, adapter)
+    props = bus.get_proxy_object(BLUEZ, adapter, intro).get_interface(PROPS_IFACE)
     try:
-        adapter = "/org/bluez/hci0"
-        intro = await bus.introspect(BLUEZ, adapter)
-        props = bus.get_proxy_object(BLUEZ, adapter, intro).get_interface(PROPS_IFACE)
-        try:
-            await props.call_set("org.bluez.Adapter1", "Powered", Variant("b", False))
-            await asyncio.sleep(2)
-        finally:
-            await props.call_set("org.bluez.Adapter1", "Powered", Variant("b", True))
-        await asyncio.sleep(3)
-        for tentativa in range(4):
-            dev = await _device(bus, mac)
-            if dev is None:
-                return False
-            d, _ = dev
-            try:
-                if not await d.get_connected():
-                    await _connect_audio(d)
-                return True
-            except DBusError as exc:
-                log.info("falha ao reconectar %s (tentativa %d): %s", mac, tentativa + 1, exc)
-                await asyncio.sleep(3)
-        return False
+        await props.call_set("org.bluez.Adapter1", "Powered", Variant("b", False))
+        await asyncio.sleep(2)
     finally:
-        bus.disconnect()
+        await props.call_set("org.bluez.Adapter1", "Powered", Variant("b", True))
+    await asyncio.sleep(3)
+    for tentativa in range(4):
+        dev = await _device(bus, mac)
+        if dev is None:
+            return False
+        d, _ = dev
+        try:
+            if not await d.get_connected():
+                await _connect_audio(d)
+            return True
+        except DBusError as exc:
+            log.info("falha ao reconectar %s (tentativa %d): %s", mac, tentativa + 1, exc)
+            await asyncio.sleep(3)
+    return False

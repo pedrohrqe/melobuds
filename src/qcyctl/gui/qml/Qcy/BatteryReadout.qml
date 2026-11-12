@@ -78,7 +78,7 @@ Item {
                 width: parent.width * Math.min(root.shown, 100) / 100
                 color: root.tone
                 SequentialAnimation on opacity {
-                    running: root.charging && !Theme.reduce
+                    running: root.charging && Theme.loop
                     loops: Animation.Infinite
                     alwaysRunToEnd: true
                     NumberAnimation { to: 0.45; duration: 1200; easing.type: Easing.InOutSine }

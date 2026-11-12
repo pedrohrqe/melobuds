@@ -47,6 +47,10 @@ QtObject {
 
     // Movimento. Com "reduzir animações", só ficam fades curtos.
     property bool reduce: false
+    // Janela visível e em foco. Fora disso, os laços infinitos param: sem quadros
+    // novos, a CPU e a GPU ficam livres.
+    property bool live: true
+    readonly property bool loop: live && !reduce
     readonly property int instant: 80
     readonly property int fast: 180
     readonly property int normal: 350
