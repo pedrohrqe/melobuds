@@ -357,6 +357,8 @@ mod tests {
         assert!(out.contains("[Other]\nA=1"));
     }
 
+    // O formato de pastas do BlueZ usa ':' no nome, o que o Windows não aceita.
+    #[cfg(unix)]
     fn fixture() -> (PathBuf, WinKeys) {
         let dir = std::env::temp_dir().join(format!("qcyctl-dualboot-{}-{:?}", std::process::id(), std::thread::current().id()));
         let _ = std::fs::remove_dir_all(&dir);
@@ -373,6 +375,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn sync_dry_run_nao_altera() {
         let (dir, win) = fixture();
         let r = sync_with(&dir, &win, None, true).unwrap();
@@ -384,6 +387,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn sync_grava_com_backup_e_depois_fica_igual() {
         let (dir, win) = fixture();
         let r = sync_with(&dir, &win, Some("aa:bb:cc:dd:ee:ff"), false).unwrap();
@@ -400,6 +404,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn sync_filtra_dispositivo() {
         let (dir, win) = fixture();
         assert!(sync_with(&dir, &win, Some("00:00:00:00:00:02"), false).unwrap().is_empty());
