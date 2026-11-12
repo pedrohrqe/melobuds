@@ -11,6 +11,7 @@ Summary:        Controle do fone QCY HT05 (ANC, EQ, toques, bateria)
 License:        MIT
 BuildArch:      x86_64
 AutoReqProv:    no
+Requires:       libstdc++ libgcc mesa-libgbm
 
 %description
 Controle do fone QCY HT05 (MeloBuds ANC): ANC, transparência, equalizador,

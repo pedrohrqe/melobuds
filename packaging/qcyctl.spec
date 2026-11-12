@@ -47,9 +47,17 @@ DESCARTE = re.compile(
 )
 
 
+# Linux: estas bibliotecas vêm do sistema. Os drivers Mesa do sistema exigem a
+# libstdc++ do sistema; uma cópia mais antiga no pacote impede o OpenGL de iniciar.
+DO_SISTEMA = {"libstdc++.so.6", "libgcc_s.so.1", "libgbm.so.1"}
+
+
 def enxuga(toc):
     # Só arquivos do Qt: o filtro não toca em bleak, winrt ou no próprio app.
-    return [item for item in toc if not ("PySide6" in item[0] and DESCARTE.search(item[0]))]
+    toc = [item for item in toc if not ("PySide6" in item[0] and DESCARTE.search(item[0]))]
+    if sys.platform.startswith("linux"):
+        toc = [item for item in toc if os.path.basename(item[0]) not in DO_SISTEMA]
+    return toc
 
 
 def analise(script):
