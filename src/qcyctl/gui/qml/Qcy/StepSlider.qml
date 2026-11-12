@@ -54,7 +54,7 @@ Item {
             enabled: !Theme.reduce && !ma.pressed
             SpringAnimation { spring: Theme.snappySpring; damping: Theme.snappyDamping; epsilon: 0.25 }
         }
-        FocusRing { show: root.activeFocus; r: 10 }
+        FocusRing { show: root.activeFocus && Theme.byKeyboard(root.focusReason); r: 10 }
     }
     MouseArea {
         id: ma

@@ -50,7 +50,7 @@ Item {
             color: root.checked ? Theme.accentInk : Theme.text2
             Behavior on x { enabled: !Theme.reduce; SpringAnimation { spring: Theme.snappySpring; damping: Theme.snappyDamping; epsilon: 0.25 } }
         }
-        FocusRing { show: root.activeFocus; r: 12 }
+        FocusRing { show: root.activeFocus && Theme.byKeyboard(root.focusReason); r: 12 }
     }
     MouseArea {
         anchors.fill: parent

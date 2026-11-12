@@ -15,6 +15,7 @@ QtObject {
     readonly property color text3: "#6E747B"         // só para desativado e decoração
     readonly property color accent: "#8CCBFF"        // 10:1 sobre surface
     readonly property color accentSoft: "#268CCBFF"
+    readonly property color pill: "#2D3D4D"          // opção ativa do controle segmentado, sem borda
     readonly property color accentInk: "#0B1620"     // texto sobre accent
     readonly property color ok: "#4ADE80"
     readonly property color warn: "#FBBF24"
@@ -55,6 +56,8 @@ QtObject {
     readonly property int fast: 180
     readonly property int normal: 350
     readonly property int slow: 600
+    // O anel de foco só aparece na navegação por teclado, nunca depois de um clique.
+    function byKeyboard(reason) { return reason === Qt.TabFocusReason || reason === Qt.BacktabFocusReason }
     function d(ms) { return reduce ? Math.min(ms, 150) : ms }
     // Molas (SpringAnimation). Amortecimento alto: sem overshoot visível em controles.
     readonly property real snappySpring: 5.0

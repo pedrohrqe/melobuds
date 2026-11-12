@@ -31,9 +31,7 @@ FocusScope {
             width: root.segW
             radius: Theme.radiusSm
             visible: root.current >= 0
-            color: Theme.surfaceHi
-            border.width: 1
-            border.color: Theme.edgeLight
+            color: Theme.pill
             x: 3 + Math.max(root.current, 0) * root.segW
             Behavior on x {
                 enabled: !Theme.reduce
@@ -74,5 +72,5 @@ FocusScope {
             }
         }
     }
-    FocusRing { show: root.activeFocus; r: Theme.radiusSm + 2 }
+    FocusRing { show: root.activeFocus && Theme.byKeyboard(root.focusReason); r: Theme.radiusSm + 2 }
 }

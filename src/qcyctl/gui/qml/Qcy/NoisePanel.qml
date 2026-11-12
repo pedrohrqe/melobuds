@@ -29,18 +29,12 @@ Card {
             spacing: Theme.s2
             visible: backend.noiseKind === 1
             FieldLabel { text: "Ambiente" }
-            Flow {
+            // Mesma largura dos controles de ruído e de intensidade.
+            SegmentedControl {
                 width: parent.width
-                spacing: Theme.s2
-                Repeater {
-                    model: backend.ancScenes
-                    Chip {
-                        required property var modelData
-                        text: modelData.label
-                        checked: backend.ancScene === modelData.key
-                        onClicked: backend.setNoise(1, modelData.key, backend.ancLevel)
-                    }
-                }
+                options: backend.ancScenes.map((s) => s.label)
+                current: backend.ancScenes.findIndex((s) => s.key === backend.ancScene)
+                onPicked: (i) => backend.setNoise(1, backend.ancScenes[i].key, backend.ancLevel)
             }
             Item { width: 1; height: Theme.s1 }
             FieldLabel { text: "Intensidade"; visible: backend.ancScene !== "wind" }

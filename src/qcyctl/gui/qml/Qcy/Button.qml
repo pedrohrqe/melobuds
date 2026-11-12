@@ -36,5 +36,5 @@ Rectangle {
         cursorShape: Qt.PointingHandCursor
         onClicked: root.clicked()
     }
-    FocusRing { show: root.activeFocus; r: Theme.radiusSm }
+    FocusRing { show: root.activeFocus && Theme.byKeyboard(root.focusReason); r: Theme.radiusSm }
 }
